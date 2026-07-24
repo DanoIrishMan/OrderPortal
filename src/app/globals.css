@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50;
+}
+
+.input {
+  @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200;
+}
+
+.card {
+  @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm;
+}
+
+.table-wrap {
+  @apply overflow-x-auto rounded-xl border border-slate-200 bg-white;
+}
+
+table.data-table {
+  @apply min-w-full divide-y divide-slate-200 text-sm;
+}
+
+table.data-table thead {
+  @apply bg-slate-50;
+}
+
+table.data-table th {
+  @apply px-4 py-3 text-left font-medium text-slate-600;
+}
+
+table.data-table td {
+  @apply px-4 py-3 text-slate-700;
+}
+
+table.data-table tbody tr {
+  @apply border-t border-slate-100 hover:bg-slate-50;
+}

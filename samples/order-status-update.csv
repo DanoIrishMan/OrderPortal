@@ -1,0 +1,4 @@
+order_number,status,expected_delivery_date,notes
+ORD-1001,In Production,2026-02-05,Embroidery complete - awaiting QC
+ORD-1002,Shipped,2026-01-28,Dispatched via courier
+JOB-2201,Awaiting Artwork,2026-02-20,Logo proof sent to client
