@@ -12,25 +12,6 @@ A web app for sales teams managing pro club clients. Upload order PDFs, apply CS
 - **Client portal** — clients view their orders, status history, and self-serve downloads
 - **Scheduled exports** — configure weekly export schedules (email requires SMTP in production)
 
-## Quick Start
-
-```bash
-cd C:\Users\danoe\Projects\pro-club-order-portal
-npm install
-npm run db:setup
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
-### Demo Logins
-
-| Role   | Email                   | Password  |
-|--------|-------------------------|-----------|
-| Admin  | admin@portal.local      | admin123  |
-| Client | riverside@portal.local  | client123 |
-| Client | summit@portal.local     | client123 |
-
 ## Environment
 
 Copy `.env.example` to `.env`:
