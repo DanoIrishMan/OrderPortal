@@ -312,7 +312,7 @@ export default function PdfImportPageClient() {
               onClick={() =>
                 setReview({
                   ...review,
-                  rows: [...review.rows, { orderNumber: "", status: "RECEIVED" }],
+                  rows: [...review.rows, { orderNumber: "", status: "In Production" }],
                 })
               }
               className="btn-secondary"

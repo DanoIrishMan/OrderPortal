@@ -23,10 +23,43 @@ export function parseStatus(value: string | null | undefined): OrderStatusValue 
   return null;
 }
 
+const ORDINAL_DATE_PATTERN =
+  /^(\d{1,2})(?:st|nd|rd|th)?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{2,4})$/i;
+
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  feb: 1,
+  mar: 2,
+  apr: 3,
+  may: 4,
+  jun: 5,
+  jul: 6,
+  aug: 7,
+  sep: 8,
+  oct: 9,
+  nov: 10,
+  dec: 11,
+};
+
 export function parseDate(value: string | null | undefined): Date | null {
   if (!value?.trim()) return null;
   if (/tba|n\/a|pending|unknown/i.test(value.trim())) return null;
-  const parsed = new Date(value);
+
+  const trimmed = value.trim();
+  const ordinalMatch = trimmed.match(ORDINAL_DATE_PATTERN);
+  if (ordinalMatch) {
+    const day = Number.parseInt(ordinalMatch[1], 10);
+    const month = MONTH_INDEX[ordinalMatch[2].slice(0, 3).toLowerCase()];
+    if (month === undefined) return null;
+
+    let year = Number.parseInt(ordinalMatch[3], 10);
+    if (year < 100) year += 2000;
+
+    const parsed = new Date(Date.UTC(year, month, day));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 

@@ -1,7 +1,73 @@
 import fs from "fs/promises";
 import pdf from "pdf-parse";
 import { ParsedOrderRow } from "@/types/orders";
-import { normalizeOrderNumber, parseDate, parseInteger, parseNumber } from "./utils";
+import { formatDate, normalizeOrderNumber, parseDate, parseInteger, parseNumber } from "./utils";
+
+/** In-house jobs system PDF (e.g. DLES7803) */
+function isInHouseOrderPdf(text: string): boolean {
+  return (
+    /PO\s*Number\s*:/i.test(text) &&
+    /CUSTOMER\s*DETAILS/i.test(text) &&
+    /Design\s*Name/i.test(text) &&
+    /Total\s*Garments/i.test(text)
+  );
+}
+
+function parseInHouseOrderPdf(text: string): ParsedOrderRow {
+  const headerSection = text.split(/CUSTOMER\s*DETAILS/i)[0] ?? text;
+  const orderDetailsSection =
+    text.match(/ORDER\s*DETAILS([\s\S]*?)(?:ADDITIONAL\s*PRODUCTION\s*INFO|QUANTITIES)/i)?.[1] ??
+    "";
+
+  const orderNumberMatch = text.match(/^PO\s*Number\s*:\s*([A-Z0-9-]+)/im);
+  const orderNumber = orderNumberMatch
+    ? normalizeOrderNumber(orderNumberMatch[1].trim())
+    : "";
+
+  const customerMatch = text.match(/Customer\s*Name\s*([\s\S]+?)(?=\nAccount\s*Number)/i);
+  const accountName = customerMatch?.[1]?.trim() ?? null;
+
+  const orderDateRaw =
+    headerSection.match(/Order\s*Date\s*:?\s*(.+?)(?=\n)/i)?.[1]?.trim() ??
+    orderDetailsSection.match(/Order\s*Date\s*(.+?)(?=\n)/i)?.[1]?.trim() ??
+    null;
+
+  const expectedDeliveryRaw =
+    headerSection.match(/Expected\s*Dispatch\s*:?\s*(.+?)(?=\n)/i)?.[1]?.trim() ??
+    orderDetailsSection.match(/Forecast\s*Delivery\s*Date\s*(.+?)(?=\n)/i)?.[1]?.trim() ??
+    null;
+
+  const designMatch = text.match(/Design\s*Name\s*(.+?)(?=\n)/i);
+  const description = designMatch?.[1]?.trim() ?? null;
+
+  const totalGarmentsMatch = text.match(/Total\s*Garments\s*(\d+)/i);
+  const quantity = totalGarmentsMatch ? parseInteger(totalGarmentsMatch[1]) : null;
+
+  const asscPoMatch = text.match(/Assc\.\s*PO\s*Number\s*PO\s*:?\s*(.+?)(?=\n)/i);
+  const poNumber = asscPoMatch?.[1]?.trim().replace(/^PO\s*:?\s*/i, "").trim() ?? null;
+
+  const orderDate = parseDate(orderDateRaw);
+  const expectedDeliveryDate = parseDate(expectedDeliveryRaw);
+
+  return {
+    orderNumber,
+    orderDate: orderDate ? formatDate(orderDate) : orderDateRaw,
+    poNumber,
+    csvCustomerName: accountName,
+    section: accountName,
+    description,
+    quantity,
+    unitPrice: null,
+    totalPrice: null,
+    expectedDeliveryDate: expectedDeliveryDate
+      ? formatDate(expectedDeliveryDate)
+      : expectedDeliveryRaw,
+    actualDeliveryDate: null,
+    notes: null,
+    status: "In Production",
+    lineItems: undefined,
+  };
+}
 
 /** Explicit header-style labels only — avoids splitting on bare "order:" in line text */
 const LABELED_ORDER_NUMBER_PATTERNS = [
@@ -196,6 +262,11 @@ function buildOrderRow(text: string, orderNumber: string): ParsedOrderRow {
  * Each PDF file defaults to a single order unless clearly multi-order.
  */
 export function parseOrderText(text: string): ParsedOrderRow[] {
+  if (isInHouseOrderPdf(text)) {
+    const row = parseInHouseOrderPdf(text);
+    if (row.orderNumber) return [row];
+  }
+
   const labeledOrderNumbers = findLabeledOrderNumbers(text);
 
   if (labeledOrderNumbers.length <= 1) {
