@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getClientFilter, getSession, requireAdmin } from "@/lib/auth";
+import { buildOrderViewFilter, OrderView } from "@/lib/order-filters";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -12,9 +14,12 @@ export async function GET(request: NextRequest) {
   const clientId = searchParams.get("clientId");
   const status = searchParams.get("status");
   const search = searchParams.get("search");
+  const viewParam = searchParams.get("view") as OrderView | null;
   const clientFilter = getClientFilter(session);
+  const isAdmin = session.user.role === "ADMIN";
+  const view: OrderView = viewParam ?? (isAdmin ? "all" : "active");
 
-  const where: Record<string, unknown> = {};
+  const where: Prisma.OrderWhereInput = {};
 
   if (clientFilter) {
     where.clientId = clientFilter;
@@ -22,7 +27,11 @@ export async function GET(request: NextRequest) {
     where.clientId = clientId;
   }
 
-  if (status) where.status = status;
+  if (view !== "all") {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), buildOrderViewFilter(view)];
+  }
+
+  if (status) where.status = status as Prisma.EnumOrderStatusFilter["equals"];
 
   if (search) {
     where.OR = [
@@ -65,6 +74,7 @@ export async function POST(request: NextRequest) {
       actualDeliveryDate: body.actualDeliveryDate
         ? new Date(body.actualDeliveryDate)
         : null,
+      deliveredAt: body.status === "DELIVERED" ? new Date() : null,
       notes: body.notes,
       source: "MANUAL",
     },

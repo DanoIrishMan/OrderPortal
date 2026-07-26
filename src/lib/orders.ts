@@ -49,6 +49,8 @@ function rowToOrderFields(
     status: (parseStatus(row.status ?? undefined) ?? "RECEIVED") as OrderStatus,
     expectedDeliveryDate: parseDate(row.expectedDeliveryDate ?? undefined),
     actualDeliveryDate: parseDate(row.actualDeliveryDate ?? undefined),
+    deliveredAt:
+      parseStatus(row.status ?? undefined) === "DELIVERED" ? new Date() : null,
     notes: row.notes ?? null,
     source,
     importBatchId: importBatchId ?? null,
@@ -69,6 +71,7 @@ type OrderSnapshot = Pick<
   | "orderDate"
   | "expectedDeliveryDate"
   | "actualDeliveryDate"
+  | "deliveredAt"
 >;
 
 function buildOrderUpdates(
@@ -88,6 +91,14 @@ function buildOrderUpdates(
   };
 
   setField("status", "status", data.status, existing.status);
+  if (data.status === "DELIVERED" && existing.status !== "DELIVERED") {
+    updates.deliveredAt = new Date();
+    if (!existing.actualDeliveryDate && !data.actualDeliveryDate) {
+      updates.actualDeliveryDate = new Date();
+    }
+  } else if (data.status !== "DELIVERED" && existing.status === "DELIVERED") {
+    updates.deliveredAt = null;
+  }
   if (data.notes) setField("notes", "notes", data.notes, existing.notes);
   if (data.description) updates.description = data.description;
   if (data.poNumber) updates.poNumber = data.poNumber;
@@ -198,6 +209,7 @@ export async function upsertOrderFromImport(params: {
       orderDate: true,
       expectedDeliveryDate: true,
       actualDeliveryDate: true,
+      deliveredAt: true,
     },
   });
 
@@ -351,6 +363,8 @@ export async function commitPdfImport(params: {
         status: (parseStatus(row.status ?? undefined) ?? "RECEIVED") as OrderStatus,
         expectedDeliveryDate: parseDate(row.expectedDeliveryDate ?? undefined),
         actualDeliveryDate: parseDate(row.actualDeliveryDate ?? undefined),
+        deliveredAt:
+          parseStatus(row.status ?? undefined) === "DELIVERED" ? new Date() : null,
         notes: row.notes ?? null,
         source: OrderSource.PDF_IMPORT,
         importBatchId: params.batchId,

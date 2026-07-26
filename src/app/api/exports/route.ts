@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get("dateTo");
   const updatedSince = searchParams.get("updatedSince");
   const openOnly = searchParams.get("openOnly") === "true";
+  const activeReport = searchParams.get("activeReport") === "true";
   const includeChanges = searchParams.get("includeChanges") === "true";
   const type = searchParams.get("type");
 
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
     dateTo: dateTo ? new Date(dateTo) : undefined,
     updatedSince: updatedSince ? new Date(updatedSince) : undefined,
     openOnly,
+    activeReport,
   });
 
   const safeName = client.name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();

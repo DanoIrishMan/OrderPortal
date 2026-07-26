@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
+import { AdminUsersForm } from "@/components/AdminUsersForm";
 
 interface Client {
   id: string;
@@ -79,6 +80,14 @@ export default function SettingsPage() {
       <div className="mb-6 card max-w-lg">
         <h2 className="mb-4 text-lg font-semibold text-slate-900">Change Password</h2>
         <ChangePasswordForm />
+      </div>
+
+      <div className="mb-6 card max-w-lg">
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">Admin Users</h2>
+        <p className="mb-4 text-sm text-slate-600">
+          Add other administrators who can manage clients, imports, and orders.
+        </p>
+        <AdminUsersForm />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

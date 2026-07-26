@@ -21,11 +21,14 @@ interface Order {
   updatedAt: string;
 }
 
+type OrderView = "active" | "delivered";
+
 export default function PortalPage() {
   const { data: session } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<OrderView>("active");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,12 +36,13 @@ export default function PortalPage() {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (search) params.set("search", search);
+    params.set("view", view);
 
     fetch(`/api/orders?${params}`)
       .then((r) => r.json())
       .then(setOrders)
       .finally(() => setLoading(false));
-  }, [status, search]);
+  }, [status, search, view]);
 
   const statusCounts = orders.reduce(
     (acc, o) => {
@@ -56,22 +60,52 @@ export default function PortalPage() {
     <div>
       <PageHeader
         title={`Welcome, ${session?.user?.clientName ?? "Club Member"}`}
-        description="View your order status and download reports"
+        description={
+          view === "active"
+            ? "View your active orders and recently delivered items"
+            : "Browse archived delivered orders"
+        }
         action={
-          <Link href="/portal/export" className="btn-primary">
-            Download Report
-          </Link>
+          view === "active" ? (
+            <Link href="/portal/export" className="btn-primary">
+              Download Report
+            </Link>
+          ) : undefined
         }
       />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Total Orders" value={orders.length} />
-        <StatCard label="Open Orders" value={openOrders} />
-        <StatCard
-          label="In Production"
-          value={statusCounts["IN_PRODUCTION"] ?? 0}
-        />
+      <div className="mb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setView("active")}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${
+            view === "active"
+              ? "bg-slate-900 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          My Orders
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("delivered")}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${
+            view === "delivered"
+              ? "bg-slate-900 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          Delivered Orders
+        </button>
       </div>
+
+      {view === "active" && (
+        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <StatCard label="Visible Orders" value={orders.length} />
+          <StatCard label="Open Orders" value={openOrders} />
+          <StatCard label="In Production" value={statusCounts["IN_PRODUCTION"] ?? 0} />
+        </div>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-3">
         <select
@@ -118,7 +152,7 @@ export default function PortalPage() {
             ) : orders.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center text-slate-500">
-                  No orders yet
+                  {view === "active" ? "No active orders" : "No archived delivered orders"}
                 </td>
               </tr>
             ) : (

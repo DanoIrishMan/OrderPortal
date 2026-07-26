@@ -91,6 +91,7 @@ model Order {
   status                OrderStatus @default(RECEIVED)
   expectedDeliveryDate  DateTime?
   actualDeliveryDate    DateTime?
+  deliveredAt           DateTime?
   notes                 String?
   source                OrderSource @default(PDF_IMPORT)
   importBatchId         String?
@@ -102,6 +103,7 @@ model Order {
   @@unique([clientId, orderNumber])
   @@index([clientId, status])
   @@index([clientId, updatedAt])
+  @@index([clientId, deliveredAt])
 }
 
 model OrderEvent {

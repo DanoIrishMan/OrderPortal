@@ -20,6 +20,8 @@ interface Order {
   client: { name: string };
 }
 
+type OrderView = "active" | "delivered";
+
 export default function OrdersPageClient() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -27,6 +29,8 @@ export default function OrdersPageClient() {
   const [clientId, setClientId] = useState(searchParams.get("clientId") || "");
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<OrderView>("active");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/clients").then((r) => r.json()).then(setClients);
@@ -37,15 +41,59 @@ export default function OrdersPageClient() {
     if (clientId) params.set("clientId", clientId);
     if (status) params.set("status", status);
     if (search) params.set("search", search);
+    params.set("view", view);
 
     fetch(`/api/orders?${params}`)
       .then((r) => r.json())
       .then(setOrders);
-  }, [clientId, status, search]);
+  }, [clientId, status, search, view]);
+
+  async function handleCompleteToggle(order: Order, checked: boolean) {
+    setUpdatingId(order.id);
+    const res = await fetch(`/api/orders/${order.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markComplete: checked }),
+    });
+
+    if (res.ok) {
+      const updated = await res.json();
+      setOrders((current) =>
+        current.map((item) => (item.id === order.id ? { ...item, ...updated } : item))
+      );
+    }
+
+    setUpdatingId(null);
+  }
 
   return (
     <div>
       <PageHeader title="Orders" description="Search and manage all client orders" />
+
+      <div className="mb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setView("active")}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${
+            view === "active"
+              ? "bg-slate-900 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          Active Orders
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("delivered")}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${
+            view === "delivered"
+              ? "bg-slate-900 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          Delivered Orders
+        </button>
+      </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
@@ -76,6 +124,7 @@ export default function OrdersPageClient() {
         <table className="data-table">
           <thead>
             <tr>
+              {view === "active" && <th>Order complete</th>}
               <th>Order #</th>
               <th>Client</th>
               <th>Section</th>
@@ -88,13 +137,27 @@ export default function OrdersPageClient() {
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-500">
+                <td colSpan={view === "active" ? 8 : 7} className="py-8 text-center text-slate-500">
                   No orders found
                 </td>
               </tr>
             ) : (
               orders.map((order) => (
                 <tr key={order.id}>
+                  {view === "active" && (
+                    <td>
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={order.status === "DELIVERED"}
+                          disabled={updatingId === order.id}
+                          onChange={(e) => handleCompleteToggle(order, e.target.checked)}
+                          className="rounded"
+                        />
+                        Order complete
+                      </label>
+                    </td>
+                  )}
                   <td>
                     <Link href={`/admin/orders/${order.id}`} className="font-medium hover:underline">
                       {order.orderNumber}

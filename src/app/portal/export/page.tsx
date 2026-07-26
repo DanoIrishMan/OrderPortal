@@ -11,7 +11,7 @@ export default function PortalExportPage() {
     const params = new URLSearchParams();
     if (clientId) params.set("clientId", clientId);
     params.set("format", format);
-    params.set("openOnly", "true");
+    params.set("activeReport", "true");
     return `/api/exports?${params}`;
   }
 
@@ -19,12 +19,13 @@ export default function PortalExportPage() {
     <div>
       <PageHeader
         title="Download Report"
-        description="Export your current open orders as Excel or CSV"
+        description="Export your active orders, including delivered items from the last two weeks"
       />
 
       <div className="card max-w-lg space-y-4">
         <p className="text-sm text-slate-600">
-          Download a report of your open orders (excluding delivered and cancelled).
+          Download a report of your active orders. Delivered orders stay on this report for two
+          weeks before moving to the Delivered Orders tab.
         </p>
 
         <div className="flex gap-3">

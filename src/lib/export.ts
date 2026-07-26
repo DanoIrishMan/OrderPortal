@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { prisma } from "./db";
 import { EXPORT_COLUMNS, ORDER_STATUS_LABELS } from "./constants";
+import { buildActiveOrdersFilter } from "./order-filters";
 import { formatDate, formatDateTime, formatSectionLabel } from "./utils";
 import { OrderStatus, Prisma } from "@prisma/client";
 
@@ -45,13 +46,16 @@ export async function fetchOrdersForExport(params: {
   updatedSince?: Date;
   status?: OrderStatus;
   openOnly?: boolean;
+  activeReport?: boolean;
 }) {
   const where: Prisma.OrderWhereInput = {
     clientId: params.clientId,
   };
 
   if (params.status) where.status = params.status;
-  if (params.openOnly) {
+  if (params.activeReport) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), buildActiveOrdersFilter()];
+  } else if (params.openOnly) {
     where.status = { notIn: ["DELIVERED", "CANCELLED"] };
   }
   if (params.updatedSince) {
