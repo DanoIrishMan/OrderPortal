@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUSES, OrderStatusValue } from "@/lib/constants";
-import { formatCurrency, formatDate, formatSectionLabel } from "@/lib/utils";
+import { formatDate, formatSectionLabel } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -15,6 +15,7 @@ interface Order {
   orderDate: string | null;
   poNumber: string | null;
   description: string | null;
+  quantity: number | null;
   totalPrice: number | null;
   status: OrderStatusValue;
   client: { name: string };
@@ -71,9 +72,13 @@ export default function OrdersPageClient() {
 
     if (res.ok) {
       const updated = await res.json();
-      setOrders((current) =>
-        current.map((item) => (item.id === order.id ? { ...item, ...updated } : item))
-      );
+      if (view === "active" && checked) {
+        setOrders((current) => current.filter((item) => item.id !== order.id));
+      } else {
+        setOrders((current) =>
+          current.map((item) => (item.id === order.id ? { ...item, ...updated } : item))
+        );
+      }
     }
 
     setUpdatingId(null);
@@ -197,7 +202,7 @@ export default function OrdersPageClient() {
                   <td>{formatSectionLabel(order.section, order.client.name) || "—"}</td>
                   <td>{formatDate(order.orderDate ? new Date(order.orderDate) : null)}</td>
                   <td className="max-w-xs truncate">{order.description}</td>
-                  <td>{formatCurrency(order.totalPrice)}</td>
+                  <td>{order.quantity ?? "—"}</td>
                   <td>
                     <StatusBadge status={order.status} />
                   </td>

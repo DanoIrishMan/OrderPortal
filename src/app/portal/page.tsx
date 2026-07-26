@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUS_LABELS, OrderStatusValue } from "@/lib/constants";
-import { formatCurrency, formatDate, formatSectionLabel } from "@/lib/utils";
+import { formatDate, formatSectionLabel } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -15,6 +15,7 @@ interface Order {
   section: string | null;
   orderDate: string | null;
   description: string | null;
+  quantity: number | null;
   totalPrice: number | null;
   status: OrderStatusValue;
   expectedDeliveryDate: string | null;
@@ -162,7 +163,7 @@ export default function PortalPage() {
                   <td>{formatSectionLabel(order.section, session?.user?.clientName) || "—"}</td>
                   <td>{formatDate(order.orderDate ? new Date(order.orderDate) : null)}</td>
                   <td className="max-w-xs truncate">{order.description || "—"}</td>
-                  <td>{formatCurrency(order.totalPrice)}</td>
+                  <td>{order.quantity ?? "—"}</td>
                   <td>
                     {formatDate(
                       order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null

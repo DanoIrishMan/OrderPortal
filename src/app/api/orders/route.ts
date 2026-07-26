@@ -28,7 +28,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (view !== "all") {
-    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), buildOrderViewFilter(view)];
+    const audience = isAdmin && !clientFilter ? "admin" : "client";
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      buildOrderViewFilter(view, audience),
+    ];
   }
 
   if (status) where.status = status as Prisma.EnumOrderStatusFilter["equals"];

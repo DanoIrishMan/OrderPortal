@@ -10,9 +10,7 @@ export function getDeliveredCutoff(): Date {
 }
 
 /**
- * Active = open orders plus delivered orders still within the 2-week window.
- * Uses actualDeliveryDate (falls back to updatedAt) so filtering works even
- * before deliveredAt is backfilled on older rows.
+ * Client portal: open orders plus delivered orders still within the 2-week window.
  */
 export function buildActiveOrdersFilter(cutoff = getDeliveredCutoff()): Prisma.OrderWhereInput {
   return {
@@ -29,7 +27,7 @@ export function buildActiveOrdersFilter(cutoff = getDeliveredCutoff()): Prisma.O
   };
 }
 
-/** Archived delivered orders older than the 2-week visibility window. */
+/** Client portal: delivered orders older than the 2-week visibility window. */
 export function buildArchivedDeliveredFilter(cutoff = getDeliveredCutoff()): Prisma.OrderWhereInput {
   return {
     status: "DELIVERED",
@@ -40,10 +38,28 @@ export function buildArchivedDeliveredFilter(cutoff = getDeliveredCutoff()): Pri
   };
 }
 
+/** Admin: in-progress orders only (not yet delivered). */
+export function buildAdminActiveOrdersFilter(): Prisma.OrderWhereInput {
+  return { status: { notIn: ["DELIVERED", "CANCELLED"] } };
+}
+
+/** Admin: all delivered orders. */
+export function buildAdminDeliveredOrdersFilter(): Prisma.OrderWhereInput {
+  return { status: "DELIVERED" };
+}
+
 export type OrderView = "active" | "delivered" | "all";
 
-export function buildOrderViewFilter(view: OrderView): Prisma.OrderWhereInput {
-  if (view === "active") return buildActiveOrdersFilter();
-  if (view === "delivered") return buildArchivedDeliveredFilter();
+export function buildOrderViewFilter(
+  view: OrderView,
+  audience: "admin" | "client" = "client"
+): Prisma.OrderWhereInput {
+  if (view === "all") return {};
+  if (view === "active") {
+    return audience === "admin" ? buildAdminActiveOrdersFilter() : buildActiveOrdersFilter();
+  }
+  if (view === "delivered") {
+    return audience === "admin" ? buildAdminDeliveredOrdersFilter() : buildArchivedDeliveredFilter();
+  }
   return {};
 }
