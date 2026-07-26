@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 
 interface Client {
   id: string;
@@ -74,6 +75,11 @@ export default function SettingsPage() {
         title="Settings"
         description="Configure scheduled weekly exports and system options"
       />
+
+      <div className="mb-6 card max-w-lg">
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">Change Password</h2>
+        <ChangePasswordForm />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card space-y-4">

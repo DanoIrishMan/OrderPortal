@@ -18,6 +18,7 @@ const adminLinks = [
 const portalLinks = [
   { href: "/portal", label: "My Orders" },
   { href: "/portal/export", label: "Download Report" },
+  { href: "/portal/account", label: "Account" },
 ];
 
 export function NavBar({ session: initialSession }: { session?: Session | null }) {
