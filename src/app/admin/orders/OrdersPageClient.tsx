@@ -20,7 +20,7 @@ interface Order {
   client: { name: string };
 }
 
-type OrderView = "active" | "delivered";
+type OrderView = "all" | "active" | "delivered";
 
 export default function OrdersPageClient() {
   const searchParams = useSearchParams();
@@ -29,14 +29,16 @@ export default function OrdersPageClient() {
   const [clientId, setClientId] = useState(searchParams.get("clientId") || "");
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<OrderView>("active");
+  const [view, setView] = useState<OrderView>("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetch("/api/clients").then((r) => r.json()).then(setClients);
   }, []);
 
   useEffect(() => {
+    setLoadError("");
     const params = new URLSearchParams();
     if (clientId) params.set("clientId", clientId);
     if (status) params.set("status", status);
@@ -44,8 +46,19 @@ export default function OrdersPageClient() {
     params.set("view", view);
 
     fetch(`/api/orders?${params}`)
-      .then((r) => r.json())
-      .then(setOrders);
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          setLoadError(data.error || "Failed to load orders");
+          setOrders([]);
+          return;
+        }
+        setOrders(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        setLoadError("Failed to load orders");
+        setOrders([]);
+      });
   }, [clientId, status, search, view]);
 
   async function handleCompleteToggle(order: Order, checked: boolean) {
@@ -70,7 +83,18 @@ export default function OrdersPageClient() {
     <div>
       <PageHeader title="Orders" description="Search and manage all client orders" />
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setView("all")}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${
+            view === "all"
+              ? "bg-slate-900 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          All Orders
+        </button>
         <button
           type="button"
           onClick={() => setView("active")}
@@ -94,6 +118,12 @@ export default function OrdersPageClient() {
           Delivered Orders
         </button>
       </div>
+
+      {loadError && (
+        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>

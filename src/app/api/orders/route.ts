@@ -41,16 +41,24 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  const orders = await prisma.order.findMany({
-    where,
-    include: {
-      client: { select: { name: true } },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: 200,
-  });
+  try {
+    const orders = await prisma.order.findMany({
+      where,
+      include: {
+        client: { select: { name: true } },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 200,
+    });
 
-  return NextResponse.json(orders);
+    return NextResponse.json(orders);
+  } catch (error) {
+    console.error("Failed to fetch orders:", error);
+    return NextResponse.json(
+      { error: "Failed to load orders. Run npx prisma db push on the server if this persists." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

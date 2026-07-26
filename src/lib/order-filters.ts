@@ -9,6 +9,11 @@ export function getDeliveredCutoff(): Date {
   return cutoff;
 }
 
+/**
+ * Active = open orders plus delivered orders still within the 2-week window.
+ * Uses actualDeliveryDate (falls back to updatedAt) so filtering works even
+ * before deliveredAt is backfilled on older rows.
+ */
 export function buildActiveOrdersFilter(cutoff = getDeliveredCutoff()): Prisma.OrderWhereInput {
   return {
     OR: [
@@ -16,20 +21,21 @@ export function buildActiveOrdersFilter(cutoff = getDeliveredCutoff()): Prisma.O
       {
         status: "DELIVERED",
         OR: [
-          { deliveredAt: { gte: cutoff } },
-          { deliveredAt: null, updatedAt: { gte: cutoff } },
+          { actualDeliveryDate: { gte: cutoff } },
+          { actualDeliveryDate: null, updatedAt: { gte: cutoff } },
         ],
       },
     ],
   };
 }
 
+/** Archived delivered orders older than the 2-week visibility window. */
 export function buildArchivedDeliveredFilter(cutoff = getDeliveredCutoff()): Prisma.OrderWhereInput {
   return {
     status: "DELIVERED",
     OR: [
-      { deliveredAt: { lt: cutoff } },
-      { deliveredAt: null, updatedAt: { lt: cutoff } },
+      { actualDeliveryDate: { lt: cutoff } },
+      { actualDeliveryDate: null, updatedAt: { lt: cutoff } },
     ],
   };
 }
