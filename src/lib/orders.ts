@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { CustomerMappingValue, ParsedOrderRow } from "@/types/orders";
-import { normalizeOrderNumber, parseDate, resolveImportStatus } from "./utils";
+import { normalizeOrderNumber, parseDate, resolveImportStatus, getDisplayStatus } from "./utils";
 import { findClientIdByRelatedName } from "./customer-matching";
+import { DISPLAY_STATUS_ORDER, DisplayOrderStatus } from "./constants";
 import { Order, OrderSource, OrderStatus } from "@prisma/client";
 
 export async function markDuplicates(
@@ -429,12 +430,11 @@ export async function commitPdfImport(params: {
 export async function getDashboardStats(clientId?: string) {
   const where = clientId ? { clientId } : {};
 
-  const [totalOrders, statusCounts, recentImports, overdueOrders] = await Promise.all([
+  const [totalOrders, ordersForDisplay, recentImports, overdueOrders] = await Promise.all([
     prisma.order.count({ where }),
-    prisma.order.groupBy({
-      by: ["status"],
+    prisma.order.findMany({
       where,
-      _count: { status: true },
+      select: { status: true, expectedDeliveryDate: true },
     }),
     prisma.importBatch.findMany({
       where: clientId ? { clientId } : {},
@@ -451,11 +451,17 @@ export async function getDashboardStats(clientId?: string) {
     }),
   ]);
 
+  const displayStatusCounts = new Map<DisplayOrderStatus, number>();
+  for (const order of ordersForDisplay) {
+    const display = getDisplayStatus(order);
+    displayStatusCounts.set(display, (displayStatusCounts.get(display) ?? 0) + 1);
+  }
+
   return {
     totalOrders,
-    statusCounts: statusCounts.map((s) => ({
-      status: s.status,
-      count: s._count.status,
+    displayStatusCounts: DISPLAY_STATUS_ORDER.map((status) => ({
+      status,
+      count: displayStatusCounts.get(status) ?? 0,
     })),
     recentImports,
     overdueOrders,

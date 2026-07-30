@@ -3,6 +3,19 @@ import { Prisma } from "@prisma/client";
 /** Days delivered orders stay visible on active client reports before archiving. */
 export const DELIVERED_VISIBLE_DAYS = 14;
 
+export function getStartOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/** Orders past date required that are not shipped, delivered, or cancelled. */
+export function buildDelayedOrdersFilter(): Prisma.OrderWhereInput {
+  return {
+    status: { notIn: ["SHIPPED", "DELIVERED", "CANCELLED"] },
+    expectedDeliveryDate: { not: null, lt: getStartOfTodayUtc() },
+  };
+}
+
 export function getDeliveredCutoff(): Date {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - DELIVERED_VISIBLE_DAYS);

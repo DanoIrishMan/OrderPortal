@@ -27,6 +27,11 @@ export const DISPLAY_STATUS_LABELS: Record<DisplayOrderStatus, string> = {
   DELAYED: "Delayed",
 };
 
+export const DISPLAY_STATUS_ORDER: DisplayOrderStatus[] = [
+  ...ORDER_STATUSES,
+  "DELAYED",
+];
+
 export const EXPORT_COLUMNS = [
   { key: "orderNumber", header: "Order Number" },
   { key: "section", header: "Section" },

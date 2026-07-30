@@ -4,7 +4,7 @@ import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getDashboardStats } from "@/lib/orders";
 import { prisma } from "@/lib/db";
-import { ORDER_STATUS_LABELS, OrderStatusValue } from "@/lib/constants";
+import { DISPLAY_STATUS_ORDER } from "@/lib/constants";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function AdminDashboardPage() {
@@ -18,7 +18,7 @@ export default async function AdminDashboardPage() {
   ]);
 
   const statusMap = Object.fromEntries(
-    stats.statusCounts.map((s) => [s.status, s.count])
+    stats.displayStatusCounts.map((s) => [s.status, s.count])
   );
 
   return (
@@ -49,7 +49,7 @@ export default async function AdminDashboardPage() {
         <div className="card">
           <h2 className="mb-4 text-lg font-semibold text-slate-900">Orders by Status</h2>
           <div className="space-y-3">
-            {(Object.keys(ORDER_STATUS_LABELS) as OrderStatusValue[]).map((status) => (
+            {DISPLAY_STATUS_ORDER.map((status) => (
               <div key={status} className="flex items-center justify-between">
                 <StatusBadge status={status} />
                 <span className="text-sm font-medium text-slate-700">

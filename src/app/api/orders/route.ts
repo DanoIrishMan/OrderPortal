@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getClientFilter, getSession, requireAdmin } from "@/lib/auth";
-import { buildOrderViewFilter, OrderView } from "@/lib/order-filters";
+import { buildOrderViewFilter, buildDelayedOrdersFilter, OrderView } from "@/lib/order-filters";
 import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("clientId");
+  const section = searchParams.get("section");
   const status = searchParams.get("status");
   const search = searchParams.get("search");
   const viewParam = searchParams.get("view") as OrderView | null;
@@ -35,7 +36,18 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  if (status) where.status = status as Prisma.EnumOrderStatusFilter["equals"];
+  if (status === "DELAYED") {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      buildDelayedOrdersFilter(),
+    ];
+  } else if (status) {
+    where.status = status as Prisma.EnumOrderStatusFilter["equals"];
+  }
+
+  if (section) {
+    where.section = section;
+  }
 
   if (search) {
     where.OR = [

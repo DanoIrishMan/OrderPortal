@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ORDER_STATUSES, OrderStatusValue } from "@/lib/constants";
+import { DISPLAY_STATUS_ORDER, DISPLAY_STATUS_LABELS, OrderStatusValue } from "@/lib/constants";
 import { formatDate, formatSectionLabel, getDisplayStatus } from "@/lib/utils";
 
 interface Order {
@@ -30,6 +30,8 @@ export default function OrdersPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [clientId, setClientId] = useState(searchParams.get("clientId") || "");
+  const [section, setSection] = useState("");
+  const [sections, setSections] = useState<string[]>([]);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [view, setView] = useState<OrderView>("all");
@@ -41,9 +43,23 @@ export default function OrdersPageClient() {
   }, []);
 
   useEffect(() => {
+    setSection("");
+    if (!clientId) {
+      setSections([]);
+      return;
+    }
+
+    fetch(`/api/orders/sections?clientId=${encodeURIComponent(clientId)}`)
+      .then((r) => r.json())
+      .then((data) => setSections(Array.isArray(data.sections) ? data.sections : []))
+      .catch(() => setSections([]));
+  }, [clientId]);
+
+  useEffect(() => {
     setLoadError("");
     const params = new URLSearchParams();
     if (clientId) params.set("clientId", clientId);
+    if (section) params.set("section", section);
     if (status) params.set("status", status);
     if (search) params.set("search", search);
     params.set("view", view);
@@ -62,7 +78,7 @@ export default function OrdersPageClient() {
         setLoadError("Failed to load orders");
         setOrders([]);
       });
-  }, [clientId, status, search, view]);
+  }, [clientId, section, status, search, view]);
 
   async function handleCompleteToggle(order: Order, checked: boolean) {
     setUpdatingId(order.id);
@@ -132,7 +148,7 @@ export default function OrdersPageClient() {
         </div>
       )}
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className={`mb-6 grid gap-3 ${clientId ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
         <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
           <option value="">All clients</option>
           {clients.map((c) => (
@@ -141,11 +157,24 @@ export default function OrdersPageClient() {
             </option>
           ))}
         </select>
+        {clientId && (
+          <select className="input" value={section} onChange={(e) => setSection(e.target.value)}>
+            <option value="">All sections</option>
+            {sections.map((value) => {
+              const clientName = clients.find((c) => c.id === clientId)?.name;
+              return (
+                <option key={value} value={value}>
+                  {formatSectionLabel(value, clientName) || value}
+                </option>
+              );
+            })}
+          </select>
+        )}
         <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>
-          {ORDER_STATUSES.map((s) => (
+          {DISPLAY_STATUS_ORDER.map((s) => (
             <option key={s} value={s}>
-              {s.replace(/_/g, " ")}
+              {DISPLAY_STATUS_LABELS[s]}
             </option>
           ))}
         </select>
