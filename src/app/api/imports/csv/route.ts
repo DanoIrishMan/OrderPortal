@@ -70,10 +70,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const { mappings: finalMappings, clientsCreated } = await ensureClientsForCsvCustomers(
-      preview.unmappedCustomers,
-      customerMappings
-    );
+    const { mappings: finalMappings, clientsCreated, aliasesCreated } =
+      await ensureClientsForCsvCustomers(preview.unmappedCustomers, customerMappings);
 
     const mergedMappings: Record<string, CustomerMappingValue> = {
       ...customerMappings,
@@ -92,6 +90,7 @@ export async function POST(request: NextRequest) {
     );
 
     result.clientsCreated = clientsCreated;
+    result.aliasesCreated = aliasesCreated;
 
     await prisma.importBatch.update({
       where: { id: batch.id },
@@ -109,6 +108,7 @@ export async function POST(request: NextRequest) {
           byClient: result.byClient,
           customerMappings: mergedMappings,
           clientsCreated,
+          aliasesCreated,
         }),
         committedAt: new Date(),
       },

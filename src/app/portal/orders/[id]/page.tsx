@@ -6,7 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { OrderStatusValue } from "@/lib/constants";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, getDisplayStatus } from "@/lib/utils";
 
 interface OrderEvent {
   id: string;
@@ -27,6 +27,7 @@ interface OrderDetail {
   totalPrice: number | null;
   status: OrderStatusValue;
   expectedDeliveryDate: string | null;
+  leavingOsFactoryDate: string | null;
   actualDeliveryDate: string | null;
   notes: string | null;
   events: OrderEvent[];
@@ -54,7 +55,7 @@ export default function PortalOrderDetailPage() {
       <PageHeader
         title={`Order ${order.orderNumber}`}
         description={`Last updated ${formatDateTime(new Date(order.updatedAt))}`}
-        action={<StatusBadge status={order.status} />}
+        action={<StatusBadge status={getDisplayStatus(order)} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -83,7 +84,13 @@ export default function PortalOrderDetailPage() {
               <dd className="text-sm text-slate-900">{formatCurrency(order.totalPrice)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-slate-500">Expected Delivery</dt>
+              <dt className="text-xs font-medium text-slate-500">Leaving OS Factory</dt>
+              <dd className="text-sm text-slate-900">
+                {formatDate(order.leavingOsFactoryDate ? new Date(order.leavingOsFactoryDate) : null) || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-slate-500">Date Required</dt>
               <dd className="text-sm text-slate-900">
                 {formatDate(order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null) || "—"}
               </dd>

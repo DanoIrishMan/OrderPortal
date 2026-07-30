@@ -15,10 +15,11 @@ import {
   parseDate,
   parseInteger,
   parseNumber,
-  parseStatus,
+  resolveImportStatus,
 } from "./utils";
 import { OrderSource } from "@prisma/client";
 import { upsertOrderFromImport } from "./orders";
+import { findClientIdByRelatedName } from "./customer-matching";
 
 export function parseCsvContent(content: string): {
   headers: string[];
@@ -73,7 +74,9 @@ export function mapSalesRepSummaryRow(row: Record<string, string>): ParsedOrderR
 
   const orderDate = cleanCsvField(row.Date_Ordered);
   const required = cleanCsvField(row.Date_Required);
+  const scheduledOffshore = cleanCsvField(row.Date_Scheduled_Offshore);
   const received = cleanCsvField(row.Date_Received);
+  const notes = noteParts.length > 0 ? noteParts.join(" | ") : null;
 
   return {
     orderNumber: normalizeOrderNumber(orderNo),
@@ -82,10 +85,12 @@ export function mapSalesRepSummaryRow(row: Record<string, string>): ParsedOrderR
     poNumber: null,
     description,
     quantity: parseInteger(row.Quantity),
-    status: cleanCsvField(row.Workflow_Status) ?? undefined,
+    status: resolveImportStatus(cleanCsvField(row.Workflow_Status), notes) ?? undefined,
     expectedDeliveryDate: required && parseDate(required) ? required : null,
+    leavingOsFactoryDate:
+      scheduledOffshore && parseDate(scheduledOffshore) ? scheduledOffshore : null,
     actualDeliveryDate: received && parseDate(received) ? received : null,
-    notes: noteParts.length > 0 ? noteParts.join(" | ") : null,
+    notes,
     lineItems: style
       ? [
           {
@@ -134,7 +139,21 @@ export function suggestMapping(headers: string[]): CsvMappingConfig {
     unitPrice: find("unit price", "price each", "unit_price"),
     totalPrice: find("total price", "total", "amount", "order total", "total_price"),
     status: find("workflow_status", "status", "order status", "order_status", "production status"),
-    expectedDeliveryDate: find("date_required", "expected delivery", "expected_delivery", "due date", "delivery date"),
+    expectedDeliveryDate: find(
+      "date_required",
+      "date wanted",
+      "date_wanted",
+      "expected delivery",
+      "expected_delivery",
+      "due date",
+      "delivery date"
+    ),
+    leavingOsFactoryDate: find(
+      "date_scheduled_offshore",
+      "scheduled offshore",
+      "schedualed offshore",
+      "leaving os factory"
+    ),
     actualDeliveryDate: find("date_received", "actual delivery", "actual_delivery", "delivered date"),
     notes: find("latest_note", "notes", "comment", "remarks", "comments"),
   };
@@ -158,6 +177,9 @@ export function mapCsvRowToOrder(
   const orderNumberRaw = getMappedValue(row, mapping, "orderNumber");
   if (!orderNumberRaw) return null;
 
+  const workflowStatus = getMappedValue(row, mapping, "status");
+  const notes = getMappedValue(row, mapping, "notes");
+
   return {
     orderNumber: normalizeOrderNumber(orderNumberRaw),
     orderDate: getMappedValue(row, mapping, "orderDate"),
@@ -166,10 +188,11 @@ export function mapCsvRowToOrder(
     quantity: parseInteger(getMappedValue(row, mapping, "quantity")),
     unitPrice: parseNumber(getMappedValue(row, mapping, "unitPrice")),
     totalPrice: parseNumber(getMappedValue(row, mapping, "totalPrice")),
-    status: getMappedValue(row, mapping, "status") ?? undefined,
+    status: resolveImportStatus(workflowStatus, notes) ?? undefined,
     expectedDeliveryDate: getMappedValue(row, mapping, "expectedDeliveryDate"),
+    leavingOsFactoryDate: getMappedValue(row, mapping, "leavingOsFactoryDate"),
     actualDeliveryDate: getMappedValue(row, mapping, "actualDeliveryDate"),
-    notes: getMappedValue(row, mapping, "notes"),
+    notes,
   };
 }
 
@@ -178,12 +201,24 @@ function normalizeCustomerName(name: string | null | undefined): string | null {
   return cleaned || null;
 }
 
-async function buildCustomerLookup(
+interface CustomerLookupContext {
+  lookup: Map<string, string | "skip">;
+  clients: Array<{ id: string; name: string }>;
+  aliases: Array<{ clientId: string; csvCustomerName: string }>;
+}
+
+async function buildCustomerLookupContext(
   extraMappings?: Record<string, CustomerMappingValue>
-): Promise<Map<string, string | "skip">> {
-  const aliases = await prisma.customerAlias.findMany({
-    include: { client: { select: { id: true, name: true } } },
-  });
+): Promise<CustomerLookupContext> {
+  const [aliases, clients] = await Promise.all([
+    prisma.customerAlias.findMany({
+      select: { csvCustomerName: true, clientId: true },
+    }),
+    prisma.client.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   const lookup = new Map<string, string | "skip">();
   for (const alias of aliases) {
@@ -196,15 +231,32 @@ async function buildCustomerLookup(
     }
   }
 
-  return lookup;
+  return { lookup, clients, aliases };
 }
 
 function resolveClientIdForRow(
   csvCustomerName: string | null,
-  lookup: Map<string, string | "skip">
-): string | "skip" | null {
-  if (!csvCustomerName) return null;
-  return lookup.get(csvCustomerName) ?? null;
+  ctx: CustomerLookupContext
+): { clientId: string | "skip" | null; autoMatched: boolean; matchedToName: string | null } {
+  if (!csvCustomerName) {
+    return { clientId: null, autoMatched: false, matchedToName: null };
+  }
+
+  const fromLookup = ctx.lookup.get(csvCustomerName);
+  if (fromLookup) {
+    return { clientId: fromLookup, autoMatched: false, matchedToName: null };
+  }
+
+  const related = findClientIdByRelatedName(csvCustomerName, ctx.clients, ctx.aliases);
+  if (related) {
+    return {
+      clientId: related.clientId,
+      autoMatched: true,
+      matchedToName: related.matchedName,
+    };
+  }
+
+  return { clientId: null, autoMatched: false, matchedToName: null };
 }
 
 function getDistinctCustomers(rows: Record<string, string>[]): Map<string, number> {
@@ -237,19 +289,18 @@ export async function previewWeeklyCsvImport(
 ): Promise<WeeklyCsvPreviewResult> {
   const isSalesRepSummary = isSalesRepSummaryCsv(headers);
   const mappedOrders = mapCsvRowsToOrders(rows, headers);
-  const lookup = await buildCustomerLookup(customerMappings);
-  const clients = await prisma.client.findMany({
-    where: { active: true },
-    select: { id: true, name: true },
-  });
-  const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+  const ctx = await buildCustomerLookupContext(customerMappings);
+  const clientNameById = new Map(ctx.clients.map((c) => [c.id, c.name]));
 
   const customerCounts = getDistinctCustomers(rows);
   const customers: WeeklyCsvCustomerInfo[] = [];
   const unmappedCustomers: string[] = [];
 
   for (const [csvCustomerName, rowCount] of customerCounts) {
-    const resolved = resolveClientIdForRow(csvCustomerName, lookup);
+    const { clientId: resolved, autoMatched, matchedToName } = resolveClientIdForRow(
+      csvCustomerName,
+      ctx
+    );
     const isSkipped = resolved === "skip";
     const mappedClientId = resolved && resolved !== "skip" ? resolved : null;
 
@@ -263,6 +314,8 @@ export async function previewWeeklyCsvImport(
       mappedClientId,
       mappedClientName: mappedClientId ? clientNameById.get(mappedClientId) ?? null : null,
       isSkipped,
+      isAutoMatched: autoMatched,
+      matchedToName: autoMatched ? matchedToName : null,
     });
   }
 
@@ -285,7 +338,7 @@ export async function previewWeeklyCsvImport(
   for (let i = 0; i < mappedOrders.length; i++) {
     const mapped = mappedOrders[i];
     const rawCustomer = normalizeCustomerName(rows[i]?.customer ?? mapped.csvCustomerName);
-    const resolved = resolveClientIdForRow(rawCustomer, lookup);
+    const { clientId: resolved } = resolveClientIdForRow(rawCustomer, ctx);
 
     if (!mapped?.orderNumber) {
       wouldSkip++;
@@ -347,15 +400,13 @@ export async function applyWeeklyCsvImport(
     errors: [],
     unmappedCustomers: [],
     clientsCreated: [],
+    aliasesCreated: [],
     byClient: [],
   };
 
-  const lookup = await buildCustomerLookup(customerMappings);
+  const ctx = await buildCustomerLookupContext(customerMappings);
   const mappedOrders = mapCsvRowsToOrders(rows, headers);
-  const clients = await prisma.client.findMany({
-    select: { id: true, name: true },
-  });
-  const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+  const clientNameById = new Map(ctx.clients.map((c) => [c.id, c.name]));
   const byClientMap = new Map<string, WeeklyCsvByClientStats>();
 
   const unmappedSet = new Set<string>();
@@ -369,7 +420,7 @@ export async function applyWeeklyCsvImport(
       continue;
     }
 
-    const resolved = resolveClientIdForRow(rawCustomer, lookup);
+    const { clientId: resolved } = resolveClientIdForRow(rawCustomer, ctx);
 
     if (!resolved) {
       if (rawCustomer) unmappedSet.add(rawCustomer);
@@ -489,7 +540,7 @@ export async function applyCsvUpdates(
       }
     };
 
-    const status = parseStatus(mapped.status ?? undefined);
+    const status = resolveImportStatus(mapped.status ?? undefined, mapped.notes ?? undefined);
     if (status) setField("status", "status", status, existing.status);
 
     if (mapped.notes) setField("notes", "notes", mapped.notes, existing.notes);
@@ -504,6 +555,9 @@ export async function applyCsvUpdates(
 
     const expectedDelivery = parseDate(mapped.expectedDeliveryDate ?? undefined);
     if (expectedDelivery) updates.expectedDeliveryDate = expectedDelivery;
+
+    const leavingOsFactory = parseDate(mapped.leavingOsFactoryDate ?? undefined);
+    if (leavingOsFactory) updates.leavingOsFactoryDate = leavingOsFactory;
 
     const actualDelivery = parseDate(mapped.actualDeliveryDate ?? undefined);
     if (actualDelivery) updates.actualDeliveryDate = actualDelivery;

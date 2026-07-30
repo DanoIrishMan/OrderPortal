@@ -1,4 +1,4 @@
-import { OrderStatusValue, STATUS_ALIASES } from "./constants";
+import { OrderStatusValue, STATUS_ALIASES, type DisplayOrderStatus } from "./constants";
 
 export function normalizeOrderNumber(value: string): string {
   return value.trim().toUpperCase().replace(/^0+(?=[A-Z0-9])/, "") || "0";
@@ -21,6 +21,18 @@ export function parseStatus(value: string | null | undefined): OrderStatusValue 
   if (Object.values(STATUS_ALIASES).includes(upper)) return upper;
 
   return null;
+}
+
+/** Prefer note text over workflow when notes indicate artwork is still pending. */
+export function resolveImportStatus(
+  workflowStatus: string | null | undefined,
+  notes: string | null | undefined
+): OrderStatusValue | null {
+  if (notes?.toLowerCase().includes("awaiting artwork")) {
+    return "AWAITING_ARTWORK";
+  }
+
+  return parseStatus(workflowStatus);
 }
 
 const ORDINAL_DATE_PATTERN =
@@ -77,6 +89,15 @@ export function parseInteger(value: string | null | undefined): number | null {
 
 export function formatDate(date: Date | null | undefined): string {
   if (!date) return "";
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+/** ISO date for HTML `<input type="date">` values. */
+export function formatDateForInput(date: Date | null | undefined): string {
+  if (!date) return "";
   return date.toISOString().slice(0, 10);
 }
 
@@ -87,7 +108,36 @@ export function formatDateTime(date: Date | null | undefined): string {
   const year = date.getUTCFullYear();
   const hours = String(date.getUTCHours()).padStart(2, "0");
   const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
+export function getDisplayStatus(order: {
+  status: OrderStatusValue;
+  expectedDeliveryDate: Date | string | null | undefined;
+}): DisplayOrderStatus {
+  if (
+    order.status === "SHIPPED" ||
+    order.status === "DELIVERED" ||
+    order.status === "CANCELLED"
+  ) {
+    return order.status;
+  }
+
+  if (!order.expectedDeliveryDate) return order.status;
+
+  const required = new Date(order.expectedDeliveryDate);
+  if (Number.isNaN(required.getTime())) return order.status;
+
+  const requiredDay = Date.UTC(
+    required.getUTCFullYear(),
+    required.getUTCMonth(),
+    required.getUTCDate()
+  );
+  const now = new Date();
+  const todayDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+  if (requiredDay < todayDay) return "DELAYED";
+  return order.status;
 }
 
 export function formatCurrency(value: number | null | undefined): string {

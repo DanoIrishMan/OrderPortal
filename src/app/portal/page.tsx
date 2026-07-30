@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUS_LABELS, OrderStatusValue } from "@/lib/constants";
-import { formatDate, formatSectionLabel } from "@/lib/utils";
+import { formatDate, formatSectionLabel, getDisplayStatus } from "@/lib/utils";
 
 interface Order {
   id: string;
@@ -19,6 +19,7 @@ interface Order {
   totalPrice: number | null;
   status: OrderStatusValue;
   expectedDeliveryDate: string | null;
+  leavingOsFactoryDate: string | null;
   updatedAt: string;
 }
 
@@ -135,10 +136,11 @@ export default function PortalPage() {
             <tr>
               <th>Order #</th>
               <th>Section</th>
-              <th>Date</th>
+              <th>Date Ordered</th>
+              <th>Leaving OS Factory</th>
               <th>Description</th>
               <th>Total</th>
-              <th>Expected Delivery</th>
+              <th>Date Required</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -146,13 +148,13 @@ export default function PortalPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="text-center text-slate-500">
+                <td colSpan={9} className="text-center text-slate-500">
                   Loading...
                 </td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center text-slate-500">
+                <td colSpan={9} className="text-center text-slate-500">
                   {view === "active" ? "No active orders" : "No archived delivered orders"}
                 </td>
               </tr>
@@ -162,6 +164,11 @@ export default function PortalPage() {
                   <td className="font-medium text-slate-900">{order.orderNumber}</td>
                   <td>{formatSectionLabel(order.section, session?.user?.clientName) || "—"}</td>
                   <td>{formatDate(order.orderDate ? new Date(order.orderDate) : null)}</td>
+                  <td>
+                    {formatDate(
+                      order.leavingOsFactoryDate ? new Date(order.leavingOsFactoryDate) : null
+                    ) || "—"}
+                  </td>
                   <td className="max-w-xs truncate">{order.description || "—"}</td>
                   <td>{order.quantity ?? "—"}</td>
                   <td>
@@ -170,7 +177,7 @@ export default function PortalPage() {
                     ) || "—"}
                   </td>
                   <td>
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={getDisplayStatus(order)} />
                   </td>
                   <td>
                     <Link

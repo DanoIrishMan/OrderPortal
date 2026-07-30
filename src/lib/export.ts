@@ -1,8 +1,8 @@
 import ExcelJS from "exceljs";
 import { prisma } from "./db";
-import { EXPORT_COLUMNS, ORDER_STATUS_LABELS } from "./constants";
+import { EXPORT_COLUMNS, DISPLAY_STATUS_LABELS } from "./constants";
 import { buildActiveOrdersFilter } from "./order-filters";
-import { formatDate, formatDateTime, formatSectionLabel } from "./utils";
+import { formatDate, formatDateTime, formatSectionLabel, getDisplayStatus } from "./utils";
 import { OrderStatus, Prisma } from "@prisma/client";
 
 type ExportOrder = {
@@ -16,12 +16,15 @@ type ExportOrder = {
   totalPrice: number | null;
   status: OrderStatus;
   expectedDeliveryDate: Date | null;
+  leavingOsFactoryDate: Date | null;
   actualDeliveryDate: Date | null;
   notes: string | null;
   updatedAt: Date;
 };
 
 function orderToRow(order: ExportOrder, clubName?: string): Record<string, string | number> {
+  const displayStatus = getDisplayStatus(order);
+
   return {
     orderNumber: order.orderNumber,
     section: formatSectionLabel(order.section, clubName),
@@ -31,8 +34,9 @@ function orderToRow(order: ExportOrder, clubName?: string): Record<string, strin
     quantity: order.quantity ?? "",
     unitPrice: order.unitPrice ?? "",
     totalPrice: order.totalPrice ?? "",
-    status: ORDER_STATUS_LABELS[order.status],
+    status: DISPLAY_STATUS_LABELS[displayStatus],
     expectedDeliveryDate: formatDate(order.expectedDeliveryDate),
+    leavingOsFactoryDate: formatDate(order.leavingOsFactoryDate),
     actualDeliveryDate: formatDate(order.actualDeliveryDate),
     notes: order.notes ?? "",
     lastUpdated: formatDateTime(order.updatedAt),

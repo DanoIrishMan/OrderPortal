@@ -10,6 +10,8 @@ export const ORDER_STATUSES = [
 
 export type OrderStatusValue = (typeof ORDER_STATUSES)[number];
 
+export type DisplayOrderStatus = OrderStatusValue | "DELAYED";
+
 export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
   RECEIVED: "Received",
   AWAITING_ARTWORK: "Awaiting Artwork",
@@ -18,6 +20,11 @@ export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
   SHIPPED: "Shipped",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
+};
+
+export const DISPLAY_STATUS_LABELS: Record<DisplayOrderStatus, string> = {
+  ...ORDER_STATUS_LABELS,
+  DELAYED: "Delayed",
 };
 
 export const EXPORT_COLUMNS = [
@@ -30,7 +37,8 @@ export const EXPORT_COLUMNS = [
   { key: "unitPrice", header: "Unit Price" },
   { key: "totalPrice", header: "Total Price" },
   { key: "status", header: "Status" },
-  { key: "expectedDeliveryDate", header: "Expected Delivery" },
+  { key: "expectedDeliveryDate", header: "Date Required" },
+  { key: "leavingOsFactoryDate", header: "Leaving OS Factory" },
   { key: "actualDeliveryDate", header: "Actual Delivery" },
   { key: "notes", header: "Notes" },
   { key: "lastUpdated", header: "Last Updated" },
@@ -45,7 +53,8 @@ export const CSV_FIELD_OPTIONS = [
   { key: "unitPrice", label: "Unit Price", required: false },
   { key: "totalPrice", label: "Total Price", required: false },
   { key: "status", label: "Status", required: false },
-  { key: "expectedDeliveryDate", label: "Expected Delivery Date", required: false },
+  { key: "expectedDeliveryDate", label: "Date Required", required: false },
+  { key: "leavingOsFactoryDate", label: "Leaving OS Factory", required: false },
   { key: "actualDeliveryDate", label: "Actual Delivery Date", required: false },
   { key: "notes", label: "Notes", required: false },
 ] as const;

@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { CustomerMappingValue, ParsedOrderRow } from "@/types/orders";
-import { normalizeOrderNumber, parseDate, parseStatus } from "./utils";
+import { normalizeOrderNumber, parseDate, resolveImportStatus } from "./utils";
+import { findClientIdByRelatedName } from "./customer-matching";
 import { Order, OrderSource, OrderStatus } from "@prisma/client";
 
 export async function markDuplicates(
@@ -35,6 +36,8 @@ function rowToOrderFields(
   source: OrderSource,
   importBatchId?: string
 ) {
+  const status = (resolveImportStatus(row.status, row.notes) ?? "RECEIVED") as OrderStatus;
+
   return {
     clientId,
     orderNumber: row.orderNumber,
@@ -46,11 +49,11 @@ function rowToOrderFields(
     quantity: row.quantity ?? null,
     unitPrice: row.unitPrice ?? null,
     totalPrice: row.totalPrice ?? null,
-    status: (parseStatus(row.status ?? undefined) ?? "RECEIVED") as OrderStatus,
+    status,
     expectedDeliveryDate: parseDate(row.expectedDeliveryDate ?? undefined),
+    leavingOsFactoryDate: parseDate(row.leavingOsFactoryDate ?? undefined),
     actualDeliveryDate: parseDate(row.actualDeliveryDate ?? undefined),
-    deliveredAt:
-      parseStatus(row.status ?? undefined) === "DELIVERED" ? new Date() : null,
+    deliveredAt: status === "DELIVERED" ? new Date() : null,
     notes: row.notes ?? null,
     source,
     importBatchId: importBatchId ?? null,
@@ -70,6 +73,7 @@ type OrderSnapshot = Pick<
   | "totalPrice"
   | "orderDate"
   | "expectedDeliveryDate"
+  | "leavingOsFactoryDate"
   | "actualDeliveryDate"
   | "deliveredAt"
 >;
@@ -108,6 +112,7 @@ function buildOrderUpdates(
   if (data.totalPrice != null) updates.totalPrice = data.totalPrice;
   if (data.orderDate) updates.orderDate = data.orderDate;
   if (data.expectedDeliveryDate) updates.expectedDeliveryDate = data.expectedDeliveryDate;
+  if (data.leavingOsFactoryDate) updates.leavingOsFactoryDate = data.leavingOsFactoryDate;
   if (data.actualDeliveryDate) updates.actualDeliveryDate = data.actualDeliveryDate;
   if (data.lineItems) updates.lineItems = data.lineItems;
 
@@ -208,6 +213,7 @@ export async function upsertOrderFromImport(params: {
       totalPrice: true,
       orderDate: true,
       expectedDeliveryDate: true,
+      leavingOsFactoryDate: true,
       actualDeliveryDate: true,
       deliveredAt: true,
     },
@@ -274,7 +280,7 @@ function contactEmailForCsvCustomer(csvCustomerName: string): string {
 /** Find or create a portal client for a CSV customer name and link the alias. */
 export async function ensureClientForCsvCustomer(
   csvCustomerName: string
-): Promise<{ clientId: string; created: boolean }> {
+): Promise<{ clientId: string; created: boolean; aliased?: boolean }> {
   const existingAlias = await prisma.customerAlias.findUnique({
     where: { csvCustomerName },
   });
@@ -289,7 +295,20 @@ export async function ensureClientForCsvCustomer(
     await prisma.customerAlias.create({
       data: { csvCustomerName, clientId: existingClient.id },
     });
-    return { clientId: existingClient.id, created: false };
+    return { clientId: existingClient.id, created: false, aliased: true };
+  }
+
+  const [clients, aliases] = await Promise.all([
+    prisma.client.findMany({ where: { active: true }, select: { id: true, name: true } }),
+    prisma.customerAlias.findMany({ select: { clientId: true, csvCustomerName: true } }),
+  ]);
+
+  const related = findClientIdByRelatedName(csvCustomerName, clients, aliases);
+  if (related) {
+    await prisma.customerAlias.create({
+      data: { csvCustomerName, clientId: related.clientId },
+    });
+    return { clientId: related.clientId, created: false, aliased: true };
   }
 
   const client = await prisma.client.create({
@@ -311,9 +330,14 @@ export async function ensureClientForCsvCustomer(
 export async function ensureClientsForCsvCustomers(
   csvCustomerNames: string[],
   customerMappings?: Record<string, CustomerMappingValue>
-): Promise<{ mappings: Record<string, CustomerMappingValue>; clientsCreated: string[] }> {
+): Promise<{
+  mappings: Record<string, CustomerMappingValue>;
+  clientsCreated: string[];
+  aliasesCreated: string[];
+}> {
   const mappings: Record<string, CustomerMappingValue> = { ...(customerMappings ?? {}) };
   const clientsCreated: string[] = [];
+  const aliasesCreated: string[] = [];
 
   for (const csvCustomerName of csvCustomerNames) {
     if (mappings[csvCustomerName] === "skip") continue;
@@ -322,9 +346,10 @@ export async function ensureClientsForCsvCustomers(
     const result = await ensureClientForCsvCustomer(csvCustomerName);
     mappings[csvCustomerName] = result.clientId;
     if (result.created) clientsCreated.push(csvCustomerName);
+    if (result.aliased) aliasesCreated.push(csvCustomerName);
   }
 
-  return { mappings, clientsCreated };
+  return { mappings, clientsCreated, aliasesCreated };
 }
 
 export async function commitPdfImport(params: {
@@ -349,6 +374,7 @@ export async function commitPdfImport(params: {
     }
 
     try {
+      const status = (resolveImportStatus(row.status, row.notes) ?? "RECEIVED") as OrderStatus;
       const data = {
         clientId: params.clientId,
         orderNumber: row.orderNumber,
@@ -360,11 +386,11 @@ export async function commitPdfImport(params: {
         quantity: row.quantity ?? null,
         unitPrice: row.unitPrice ?? null,
         totalPrice: row.totalPrice ?? null,
-        status: (parseStatus(row.status ?? undefined) ?? "RECEIVED") as OrderStatus,
+        status,
         expectedDeliveryDate: parseDate(row.expectedDeliveryDate ?? undefined),
+        leavingOsFactoryDate: parseDate(row.leavingOsFactoryDate ?? undefined),
         actualDeliveryDate: parseDate(row.actualDeliveryDate ?? undefined),
-        deliveredAt:
-          parseStatus(row.status ?? undefined) === "DELIVERED" ? new Date() : null,
+        deliveredAt: status === "DELIVERED" ? new Date() : null,
         notes: row.notes ?? null,
         source: OrderSource.PDF_IMPORT,
         importBatchId: params.batchId,

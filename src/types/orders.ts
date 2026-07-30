@@ -10,6 +10,7 @@ export interface ParsedOrderRow {
   totalPrice?: number | null;
   status?: string | null;
   expectedDeliveryDate?: string | null;
+  leavingOsFactoryDate?: string | null;
   actualDeliveryDate?: string | null;
   notes?: string | null;
   lineItems?: Array<{ description: string; quantity?: number; unitPrice?: number }>;
@@ -28,6 +29,7 @@ export interface CsvMappingConfig {
   totalPrice?: string;
   status?: string;
   expectedDeliveryDate?: string;
+  leavingOsFactoryDate?: string;
   actualDeliveryDate?: string;
   notes?: string;
 }
@@ -47,6 +49,8 @@ export interface WeeklyCsvCustomerInfo {
   mappedClientId: string | null;
   mappedClientName: string | null;
   isSkipped: boolean;
+  isAutoMatched?: boolean;
+  matchedToName?: string | null;
 }
 
 export interface WeeklyCsvByClientStats {
@@ -77,6 +81,7 @@ export interface WeeklyCsvImportResult {
   errors: string[];
   unmappedCustomers: string[];
   clientsCreated: string[];
+  aliasesCreated?: string[];
   byClient: WeeklyCsvByClientStats[];
 }
 

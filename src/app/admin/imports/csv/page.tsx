@@ -36,6 +36,7 @@ interface WeeklyResult {
   errors: string[];
   unmappedCustomers: string[];
   clientsCreated: string[];
+  aliasesCreated?: string[];
   byClient: WeeklyCsvByClientStats[];
 }
 
@@ -229,9 +230,10 @@ export default function CsvImportPage() {
 
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Customer → Club Mapping</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Each CSV customer name maps to one portal club. Unknown customer names are
-              automatically added as new clients. Choose an existing club to override, or Skip
-              to exclude rows.
+              Each CSV customer name maps to one portal club. Names that extend an existing club
+              (e.g. &quot;Wigan Athletic Community Trust&quot; → Wigan Athletic) are linked
+              automatically as aliases. Remaining unknown names are added as new clients unless you
+              choose an existing club or Skip.
             </p>
 
             <div className="table-wrap">
@@ -252,6 +254,11 @@ export default function CsvImportPage() {
                     <tr key={customer.csvCustomerName}>
                       <td className="font-medium">
                         {customer.csvCustomerName}
+                        {customer.isAutoMatched && (
+                          <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-normal text-blue-800">
+                            Auto-linked to {customer.matchedToName ?? customer.mappedClientName}
+                          </span>
+                        )}
                         {willAutoCreate && (
                           <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-800">
                             New client
@@ -363,6 +370,17 @@ export default function CsvImportPage() {
               <p className="text-sm text-slate-600">Skipped</p>
             </div>
           </div>
+
+          {result.aliasesCreated && result.aliasesCreated.length > 0 && (
+            <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+              <p className="font-medium">Customer aliases saved</p>
+              <ul className="mt-2 list-disc pl-5">
+                {result.aliasesCreated.map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {result.clientsCreated?.length > 0 && (
             <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800">

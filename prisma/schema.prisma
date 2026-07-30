@@ -90,6 +90,7 @@ model Order {
   totalPrice            Float?
   status                OrderStatus @default(RECEIVED)
   expectedDeliveryDate  DateTime?
+  leavingOsFactoryDate  DateTime?
   actualDeliveryDate    DateTime?
   deliveredAt           DateTime?
   notes                 String?

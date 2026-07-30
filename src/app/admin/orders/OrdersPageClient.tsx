@@ -6,13 +6,15 @@ import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUSES, OrderStatusValue } from "@/lib/constants";
-import { formatDate, formatSectionLabel } from "@/lib/utils";
+import { formatDate, formatSectionLabel, getDisplayStatus } from "@/lib/utils";
 
 interface Order {
   id: string;
   orderNumber: string;
   section: string | null;
   orderDate: string | null;
+  leavingOsFactoryDate: string | null;
+  expectedDeliveryDate: string | null;
   poNumber: string | null;
   description: string | null;
   quantity: number | null;
@@ -163,7 +165,9 @@ export default function OrdersPageClient() {
               <th>Order #</th>
               <th>Client</th>
               <th>Section</th>
-              <th>Date</th>
+              <th>Date Ordered</th>
+              <th>Leaving OS Factory</th>
+              <th>Date Required</th>
               <th>Description</th>
               <th>Total</th>
               <th>Status</th>
@@ -172,7 +176,7 @@ export default function OrdersPageClient() {
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={view === "active" ? 8 : 7} className="py-8 text-center text-slate-500">
+                <td colSpan={view === "active" ? 10 : 9} className="py-8 text-center text-slate-500">
                   No orders found
                 </td>
               </tr>
@@ -201,10 +205,20 @@ export default function OrdersPageClient() {
                   <td>{order.client.name}</td>
                   <td>{formatSectionLabel(order.section, order.client.name) || "—"}</td>
                   <td>{formatDate(order.orderDate ? new Date(order.orderDate) : null)}</td>
+                  <td>
+                    {formatDate(
+                      order.leavingOsFactoryDate ? new Date(order.leavingOsFactoryDate) : null
+                    ) || "—"}
+                  </td>
+                  <td>
+                    {formatDate(
+                      order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null
+                    ) || "—"}
+                  </td>
                   <td className="max-w-xs truncate">{order.description}</td>
                   <td>{order.quantity ?? "—"}</td>
                   <td>
-                    <StatusBadge status={order.status} />
+                    <StatusBadge status={getDisplayStatus(order)} />
                   </td>
                 </tr>
               ))

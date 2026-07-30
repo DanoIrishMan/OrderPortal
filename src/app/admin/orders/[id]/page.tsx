@@ -6,7 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS, OrderStatusValue } from "@/lib/constants";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateForInput, formatDateTime, getDisplayStatus } from "@/lib/utils";
 
 interface OrderEvent {
   id: string;
@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
       <PageHeader
         title={`Order ${order.orderNumber}`}
         description={`${order.client.name} · Last updated ${formatDateTime(new Date(order.updatedAt))}`}
-        action={<StatusBadge status={order.status} />}
+        action={<StatusBadge status={getDisplayStatus(order)} />}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -110,7 +110,7 @@ export default function OrderDetailPage() {
                 name="orderDate"
                 type="date"
                 className="input"
-                defaultValue={formatDate(order.orderDate ? new Date(order.orderDate) : null)}
+                defaultValue={formatDateForInput(order.orderDate ? new Date(order.orderDate) : null)}
               />
             </div>
             <div>
@@ -153,12 +153,14 @@ export default function OrderDetailPage() {
               <input name="totalPrice" type="number" step="0.01" className="input" defaultValue={order.totalPrice ?? ""} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Expected Delivery</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date Required</label>
               <input
                 name="expectedDeliveryDate"
                 type="date"
                 className="input"
-                defaultValue={formatDate(order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null)}
+                defaultValue={formatDateForInput(
+                  order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : null
+                )}
               />
             </div>
             <div>
@@ -167,7 +169,9 @@ export default function OrderDetailPage() {
                 name="actualDeliveryDate"
                 type="date"
                 className="input"
-                defaultValue={formatDate(order.actualDeliveryDate ? new Date(order.actualDeliveryDate) : null)}
+                defaultValue={formatDateForInput(
+                  order.actualDeliveryDate ? new Date(order.actualDeliveryDate) : null
+                )}
               />
             </div>
             <div className="sm:col-span-2">
