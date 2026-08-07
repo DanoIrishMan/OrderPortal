@@ -3,7 +3,7 @@ import { CustomerMappingValue, ParsedOrderRow } from "@/types/orders";
 import { normalizeOrderNumber, parseDate, resolveImportStatus, getDisplayStatus } from "./utils";
 import { findClientIdByRelatedName } from "./customer-matching";
 import { DISPLAY_STATUS_ORDER, DisplayOrderStatus } from "./constants";
-import { Order, OrderSource, OrderStatus } from "@prisma/client";
+import { Order, OrderSource, OrderStatus, Prisma } from "@prisma/client";
 
 export async function markDuplicates(
   clientId: string,
@@ -427,8 +427,27 @@ export async function commitPdfImport(params: {
   return { created, skipped, errors };
 }
 
-export async function getDashboardStats(clientId?: string) {
-  const where = clientId ? { clientId } : {};
+export async function getDashboardStats(options?: {
+  clientId?: string;
+  accountManagerId?: string;
+}) {
+  let where: Prisma.OrderWhereInput = {};
+  let importWhere: Prisma.ImportBatchWhereInput = {};
+
+  if (options?.clientId) {
+    where = { clientId: options.clientId };
+    importWhere = { clientId: options.clientId };
+  } else if (options?.accountManagerId) {
+    where = { client: { accountManagerId: options.accountManagerId } };
+    const assignedClients = await prisma.client.findMany({
+      where: { accountManagerId: options.accountManagerId, active: true },
+      select: { id: true },
+    });
+    const clientIds = assignedClients.map((client) => client.id);
+    importWhere = {
+      OR: [{ clientId: { in: clientIds } }, { clientId: null, type: "CSV" }],
+    };
+  }
 
   const [totalOrders, ordersForDisplay, recentImports, overdueOrders] = await Promise.all([
     prisma.order.count({ where }),
@@ -437,7 +456,7 @@ export async function getDashboardStats(clientId?: string) {
       select: { status: true, expectedDeliveryDate: true },
     }),
     prisma.importBatch.findMany({
-      where: clientId ? { clientId } : {},
+      where: importWhere,
       orderBy: { createdAt: "desc" },
       take: 5,
       include: { client: { select: { name: true } } },

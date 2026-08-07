@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getClientFilter, getSession, requireAdmin } from "@/lib/auth";
+import { getClientFilter, getSession, requireAdmin, buildOrderAccessWhere } from "@/lib/auth";
 import { buildOrderViewFilter, buildDelayedOrdersFilter, OrderView } from "@/lib/order-filters";
 import { Prisma } from "@prisma/client";
 
@@ -18,18 +18,24 @@ export async function GET(request: NextRequest) {
   const viewParam = searchParams.get("view") as OrderView | null;
   const clientFilter = getClientFilter(session);
   const isAdmin = session.user.role === "ADMIN";
+  const isStaffAm =
+    session.user.role === "STAFF" && session.user.staffRole === "ACCOUNT_MANAGER";
   const view: OrderView = viewParam ?? (isAdmin ? "all" : "active");
 
   const where: Prisma.OrderWhereInput = {};
 
-  if (clientFilter) {
+  if (isAdmin) {
+    if (clientId) where.clientId = clientId;
+  } else if (isStaffAm) {
+    Object.assign(where, buildOrderAccessWhere(session));
+    if (clientId) where.clientId = clientId;
+  } else if (clientFilter) {
     where.clientId = clientFilter;
-  } else if (clientId) {
-    where.clientId = clientId;
   }
 
   if (view !== "all") {
-    const audience = isAdmin && !clientFilter ? "admin" : "client";
+    const audience =
+      isAdmin && !clientFilter && !isStaffAm ? "admin" : "client";
     where.AND = [
       ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
       buildOrderViewFilter(view, audience),

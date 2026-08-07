@@ -3,6 +3,41 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 
+const userSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  staffRole: true,
+  clientId: true,
+  createdAt: true,
+  managedClients: {
+    where: { active: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" as const },
+  },
+  client: { select: { name: true } },
+};
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  await requireAdmin();
+  const { id } = await params;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: userSelect,
+  });
+
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(user);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,6 +49,47 @@ export async function PATCH(
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (body.clientIds !== undefined) {
+    if (existing.role !== "STAFF" || existing.staffRole !== "ACCOUNT_MANAGER") {
+      return NextResponse.json(
+        { error: "Client assignment only applies to account managers" },
+        { status: 400 }
+      );
+    }
+
+    const clientIds = Array.isArray(body.clientIds)
+      ? body.clientIds.map((clientId: unknown) => String(clientId))
+      : [];
+
+    const activeClients = await prisma.client.findMany({
+      where: { id: { in: clientIds }, active: true },
+      select: { id: true },
+    });
+    const activeClientIds = activeClients.map((client) => client.id);
+
+    await prisma.$transaction([
+      prisma.client.updateMany({
+        where: { accountManagerId: id, id: { notIn: activeClientIds } },
+        data: { accountManagerId: null },
+      }),
+      ...(activeClientIds.length > 0
+        ? [
+            prisma.client.updateMany({
+              where: { id: { in: activeClientIds } },
+              data: { accountManagerId: id },
+            }),
+          ]
+        : []),
+    ]);
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: userSelect,
+    });
+
+    return NextResponse.json(user);
   }
 
   const data: {

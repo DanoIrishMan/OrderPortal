@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import {
+  assertAccountManagerClientAccess,
+  isAccountManager,
+  requireAdminOrAccountManager,
+} from "@/lib/auth";
 import { commitPdfImport } from "@/lib/orders";
 import { ParsedOrderRow } from "@/types/orders";
 
 export async function POST(request: NextRequest) {
-  await requireAdmin();
+  let session: Awaited<ReturnType<typeof requireAdminOrAccountManager>>;
+  try {
+    session = await requireAdminOrAccountManager();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const body = await request.json();
   const { clientId, batchId, rows, skipDuplicates = true } = body as {
     clientId: string;
@@ -18,6 +28,14 @@ export async function POST(request: NextRequest) {
       { error: "clientId, batchId, and rows are required" },
       { status: 400 }
     );
+  }
+
+  if (isAccountManager(session)) {
+    try {
+      await assertAccountManagerClientAccess(session.user.id, clientId);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const result = await commitPdfImport({

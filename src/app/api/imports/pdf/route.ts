@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import {
+  assertAccountManagerClientAccess,
+  isAccountManager,
+  requireAdminOrAccountManager,
+} from "@/lib/auth";
 import { saveUploadedFile } from "@/lib/upload";
 import { parsePdfFile } from "@/lib/pdf-parser";
 import { markDuplicates } from "@/lib/orders";
@@ -10,7 +14,7 @@ type ReviewRow = ParsedOrderRow & { batchId?: string; sourceFile?: string };
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdminOrAccountManager();
 
     const formData = await request.formData();
     const clientId = formData.get("clientId") as string;
@@ -18,6 +22,14 @@ export async function POST(request: NextRequest) {
 
     if (!clientId) {
       return NextResponse.json({ error: "Client is required" }, { status: 400 });
+    }
+
+    if (isAccountManager(session)) {
+      try {
+        await assertAccountManagerClientAccess(session.user.id, clientId);
+      } catch {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     if (files.length === 0) {
@@ -82,6 +94,9 @@ export async function POST(request: NextRequest) {
       duplicateCount: finalRows.filter((r) => r.isDuplicate).length,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     console.error("PDF import failed:", error);
     const message = error instanceof Error ? error.message : "Failed to parse PDF";
     return NextResponse.json({ error: message }, { status: 500 });

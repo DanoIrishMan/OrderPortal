@@ -122,6 +122,20 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if (session.user.role === "STAFF" && session.user.staffRole === "ACCOUNT_MANAGER") {
+    const client = await prisma.client.findUnique({
+      where: { id: order.clientId },
+      select: { accountManagerId: true },
+    });
+    if (client?.accountManagerId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
+  if (session.user.role === "STAFF" && session.user.staffRole === "DESIGNER") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   return NextResponse.json(order);
 }
 

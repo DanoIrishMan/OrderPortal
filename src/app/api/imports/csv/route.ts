@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import {
+  assertAccountManagerClientAccess,
+  isAccountManager,
+  requireAdminOrAccountManager,
+} from "@/lib/auth";
 import { saveUploadedFile } from "@/lib/upload";
 import {
   applyCsvUpdates,
@@ -18,8 +22,55 @@ function parseCustomerMappings(raw: string | null): Record<string, CustomerMappi
   return JSON.parse(raw) as Record<string, CustomerMappingValue>;
 }
 
+async function getImportClients(session: Awaited<ReturnType<typeof requireAdminOrAccountManager>>) {
+  if (session.user.role === "ADMIN") {
+    return prisma.client.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  return prisma.client.findMany({
+    where: { accountManagerId: session.user.id, active: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+async function validateWeeklyMappingsForAccountManager(
+  userId: string,
+  unmappedCustomers: string[],
+  customerMappings?: Record<string, CustomerMappingValue>
+) {
+  const assignedClients = await prisma.client.findMany({
+    where: { accountManagerId: userId, active: true },
+    select: { id: true },
+  });
+  const assignedIds = new Set(assignedClients.map((client) => client.id));
+
+  for (const [csvCustomerName, mapping] of Object.entries(customerMappings ?? {})) {
+    if (mapping === "skip") continue;
+    if (!assignedIds.has(mapping)) {
+      throw new Error(`Forbidden client mapping for ${csvCustomerName}`);
+    }
+  }
+
+  for (const csvCustomerName of unmappedCustomers) {
+    const mapping = customerMappings?.[csvCustomerName];
+    if (mapping === "skip") continue;
+    if (typeof mapping === "string" && assignedIds.has(mapping)) continue;
+    throw new Error(`Account managers must map ${csvCustomerName} to an assigned client or skip`);
+  }
+}
+
 export async function POST(request: NextRequest) {
-  await requireAdmin();
+  let session: Awaited<ReturnType<typeof requireAdminOrAccountManager>>;
+  try {
+    session = await requireAdminOrAccountManager();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
 
   const formData = await request.formData();
   const clientId = formData.get("clientId") as string | null;
@@ -44,17 +95,26 @@ export async function POST(request: NextRequest) {
     const preview = await previewWeeklyCsvImport(rows, headers, customerMappings);
 
     if (!commit) {
-      const clients = await prisma.client.findMany({
-        where: { active: true },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      });
+      const clients = await getImportClients(session);
 
       return NextResponse.json({
         mode: "weekly",
         ...preview,
         clients,
       });
+    }
+
+    if (isAccountManager(session)) {
+      try {
+        await validateWeeklyMappingsForAccountManager(
+          session.user.id,
+          preview.unmappedCustomers,
+          customerMappings
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Forbidden";
+        return NextResponse.json({ error: message }, { status: 403 });
+      }
     }
 
     const { filePath, filename } = await saveUploadedFile(file, "csv/weekly");
@@ -133,6 +193,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
+  if (isAccountManager(session)) {
+    try {
+      await assertAccountManagerClientAccess(session.user.id, clientId);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   let mapping: CsvMappingConfig = suggestMapping(headers);
   if (mappingJson) {
     mapping = JSON.parse(mappingJson) as CsvMappingConfig;
@@ -195,12 +263,26 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  await requireAdmin();
+  let session: Awaited<ReturnType<typeof requireAdminOrAccountManager>>;
+  try {
+    session = await requireAdminOrAccountManager();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const clientId = searchParams.get("clientId");
 
   if (!clientId) {
     return NextResponse.json({ error: "clientId required" }, { status: 400 });
+  }
+
+  if (isAccountManager(session)) {
+    try {
+      await assertAccountManagerClientAccess(session.user.id, clientId);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const mappings = await prisma.csvColumnMapping.findMany({

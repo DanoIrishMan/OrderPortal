@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { OrderUploadTabs } from "@/components/OrderUploadTabs";
 import { ParsedOrderRow } from "@/types/orders";
 
 interface Client {
@@ -111,9 +112,11 @@ export default function PdfImportPageClient() {
   return (
     <div>
       <PageHeader
-        title="In-House PDF Order"
+        title="Order Upload"
         description="Add in-house production orders by uploading a PDF from your jobs system. Select the club, review extracted fields, then add the order."
       />
+
+      <OrderUploadTabs />
 
       {commitResult && (
         <div className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">

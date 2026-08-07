@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getClientFilter, getSession, requireAdmin } from "@/lib/auth";
+import { getClientFilter, getSession, requireAdminOrAccountManager, assertAccountManagerClientAccess, isAccountManager } from "@/lib/auth";
 import {
   fetchOrdersForExport,
   generateCsvContent,
@@ -96,30 +96,45 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  await requireAdmin();
-  const body = await request.json();
+  try {
+    const session = await requireAdminOrAccountManager();
+    const body = await request.json();
 
-  const existing = await prisma.scheduledExport.findFirst({
-    where: { clientId: body.clientId },
-  });
+    if (!body.clientId) {
+      return NextResponse.json({ error: "Client is required" }, { status: 400 });
+    }
 
-  const schedule = existing
-    ? await prisma.scheduledExport.update({
-        where: { id: existing.id },
-        data: {
-          dayOfWeek: body.dayOfWeek ?? 1,
-          hour: body.hour ?? 9,
-          enabled: body.enabled ?? false,
-        },
-      })
-    : await prisma.scheduledExport.create({
-        data: {
-          clientId: body.clientId,
-          dayOfWeek: body.dayOfWeek ?? 1,
-          hour: body.hour ?? 9,
-          enabled: body.enabled ?? false,
-        },
-      });
+    if (isAccountManager(session)) {
+      await assertAccountManagerClientAccess(session.user.id, body.clientId);
+    }
 
-  return NextResponse.json(schedule);
+    const existing = await prisma.scheduledExport.findFirst({
+      where: { clientId: body.clientId },
+    });
+
+    const schedule = existing
+      ? await prisma.scheduledExport.update({
+          where: { id: existing.id },
+          data: {
+            dayOfWeek: body.dayOfWeek ?? 1,
+            hour: body.hour ?? 9,
+            enabled: body.enabled ?? false,
+          },
+        })
+      : await prisma.scheduledExport.create({
+          data: {
+            clientId: body.clientId,
+            dayOfWeek: body.dayOfWeek ?? 1,
+            hour: body.hour ?? 9,
+            enabled: body.enabled ?? false,
+          },
+        });
+
+    return NextResponse.json(schedule);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
 }

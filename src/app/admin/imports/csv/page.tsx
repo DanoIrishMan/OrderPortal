@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
+import { OrderUploadTabs } from "@/components/OrderUploadTabs";
 import {
   CustomerMappingValue,
   WeeklyCsvByClientStats,
@@ -175,9 +176,11 @@ export default function CsvImportPage() {
   return (
     <div>
       <PageHeader
-        title="Weekly Production CSV"
+        title="Order Upload"
         description="Upload your offshore factory Sales Rep Summary CSV. Orders are routed to club accounts and updated each week by order number."
       />
+
+      <OrderUploadTabs />
 
       {error && (
         <div className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>

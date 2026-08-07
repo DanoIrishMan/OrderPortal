@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { assertAccountManagerClientAccess, getSession } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
@@ -17,6 +17,17 @@ export async function GET(request: NextRequest) {
 
   if (session.user.role === "CLIENT" && session.user.clientId !== clientId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (
+    session.user.role === "STAFF" &&
+    session.user.staffRole === "ACCOUNT_MANAGER"
+  ) {
+    try {
+      await assertAccountManagerClientAccess(session.user.id, clientId);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const rows = await prisma.order.findMany({

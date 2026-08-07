@@ -12,5 +12,9 @@ export default async function HomePage() {
     redirect("/admin");
   }
 
+  if (session.user.role === "STAFF") {
+    redirect("/staff");
+  }
+
   redirect("/portal");
 }

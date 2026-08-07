@@ -16,8 +16,16 @@ interface ClientDetail {
   name: string;
   contactEmail: string;
   active: boolean;
+  accountManagerId: string | null;
+  accountManager: { id: string; name: string } | null;
   users: Array<{ id: string; email: string; name: string }>;
   _count: { orders: number };
+}
+
+interface StaffOption {
+  id: string;
+  name: string;
+  staffRole: string;
 }
 
 export default function ClientDetailPage() {
@@ -25,6 +33,7 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const [client, setClient] = useState<ClientDetail | null>(null);
+  const [accountManagers, setAccountManagers] = useState<StaffOption[]>([]);
   const [aliases, setAliases] = useState<CustomerAlias[]>([]);
   const [newAlias, setNewAlias] = useState("");
   const [loading, setLoading] = useState(true);
@@ -44,7 +53,20 @@ export default function ClientDetailPage() {
   }
 
   useEffect(() => {
-    Promise.all([loadClient(), loadAliases()])
+    Promise.all([
+      loadClient(),
+      loadAliases(),
+      fetch("/api/users")
+        .then((r) => r.json())
+        .then((users) =>
+          setAccountManagers(
+            (users ?? []).filter(
+              (u: StaffOption & { role: string }) =>
+                u.role === "STAFF" && u.staffRole === "ACCOUNT_MANAGER"
+            )
+          )
+        ),
+    ])
       .then(([clientData, aliasData]) => {
         setClient(clientData);
         setAliases(aliasData);
@@ -62,6 +84,7 @@ export default function ClientDetailPage() {
       name: form.get("name"),
       contactEmail: form.get("contactEmail"),
       active: form.get("active") === "on",
+      accountManagerId: form.get("accountManagerId") || null,
       userEmail: form.get("userEmail") || undefined,
       userName: form.get("userName") || undefined,
       userPassword: form.get("userPassword") || undefined,
@@ -168,6 +191,24 @@ export default function ClientDetailPage() {
               defaultValue={client.contactEmail}
               required
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Account Manager</label>
+            <select
+              name="accountManagerId"
+              className="input"
+              defaultValue={client.accountManagerId ?? ""}
+            >
+              <option value="">Not assigned</option>
+              {accountManagers.map((am) => (
+                <option key={am.id} value={am.id}>
+                  {am.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              The assigned account manager can view this client&apos;s orders in the staff portal.
+            </p>
           </div>
           <div>
             <label className="flex items-center gap-2 text-sm text-slate-700">

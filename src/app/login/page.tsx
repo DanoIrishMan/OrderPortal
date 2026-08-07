@@ -84,7 +84,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Demo: admin@portal.local / admin123
+          Demo: admin@portal.local / admin123 · staff: daniel.ennis@portal.local / staff123
         </p>
       </div>
     </div>

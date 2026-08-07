@@ -5,13 +5,23 @@ export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
+    const role = token?.role;
 
-    if (path.startsWith("/admin") && token?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/portal", req.url));
+    if (path.startsWith("/admin") && role !== "ADMIN") {
+      return NextResponse.redirect(new URL(role === "STAFF" ? "/staff" : "/portal", req.url));
     }
 
-    if (path.startsWith("/portal") && token?.role === "ADMIN") {
-      return NextResponse.redirect(new URL("/admin", req.url));
+    if (path.startsWith("/staff") && role !== "STAFF") {
+      return NextResponse.redirect(new URL(role === "ADMIN" ? "/admin" : "/portal", req.url));
+    }
+
+    if (path.startsWith("/portal")) {
+      if (role === "ADMIN") {
+        return NextResponse.redirect(new URL("/admin", req.url));
+      }
+      if (role === "STAFF") {
+        return NextResponse.redirect(new URL("/staff", req.url));
+      }
     }
 
     return NextResponse.next();
@@ -24,5 +34,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*"],
+  matcher: ["/admin/:path*", "/portal/:path*", "/staff/:path*"],
 };

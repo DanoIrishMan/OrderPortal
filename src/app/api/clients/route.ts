@@ -1,17 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import {
+  isAccountManager,
+  requireAdmin,
+  requireAdminOrAccountManager,
+} from "@/lib/auth";
 
 export async function GET() {
-  await requireAdmin();
-  const clients = await prisma.client.findMany({
-    orderBy: { name: "asc" },
-    include: {
-      _count: { select: { orders: true, users: true } },
-    },
-  });
-  return NextResponse.json(clients);
+  try {
+    const session = await requireAdminOrAccountManager();
+
+    if (session.user.role === "ADMIN") {
+      const clients = await prisma.client.findMany({
+        orderBy: { name: "asc" },
+        include: {
+          _count: { select: { orders: true, users: true } },
+        },
+      });
+      return NextResponse.json(clients);
+    }
+
+    const clients = await prisma.client.findMany({
+      where: { accountManagerId: session.user.id, active: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        contactEmail: true,
+        active: true,
+        accountManagerId: true,
+      },
+    });
+
+    return NextResponse.json(clients);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
 }
 
 export async function POST(request: NextRequest) {

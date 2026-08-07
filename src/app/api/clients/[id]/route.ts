@@ -14,7 +14,8 @@ export async function GET(
     where: { id },
     include: {
       users: { select: { id: true, email: true, name: true, role: true, createdAt: true } },
-      _count: { select: { orders: true } },
+      accountManager: { select: { id: true, name: true, email: true, staffRole: true } },
+      _count: { select: { orders: true, criticalPathways: true } },
     },
   });
 
@@ -39,6 +40,7 @@ export async function PATCH(
       name: body.name,
       contactEmail: body.contactEmail,
       active: body.active,
+      accountManagerId: body.accountManagerId === "" ? null : body.accountManagerId ?? undefined,
     },
   });
 

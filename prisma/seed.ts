@@ -100,6 +100,37 @@ async function main() {
     },
   });
 
+  const staffPassword = await bcrypt.hash("staff123", 10);
+
+  const danielEnnis = await prisma.user.upsert({
+    where: { email: "daniel.ennis@portal.local" },
+    update: {},
+    create: {
+      email: "daniel.ennis@portal.local",
+      name: "Daniel Ennis",
+      passwordHash: staffPassword,
+      role: "STAFF",
+      staffRole: "ACCOUNT_MANAGER",
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "ken.johnston@portal.local" },
+    update: {},
+    create: {
+      email: "ken.johnston@portal.local",
+      name: "Ken Johnston",
+      passwordHash: staffPassword,
+      role: "STAFF",
+      staffRole: "DESIGNER",
+    },
+  });
+
+  await prisma.client.update({
+    where: { id: bohemians.id },
+    data: { accountManagerId: danielEnnis.id },
+  });
+
   async function setAlias(csvCustomerName: string, clientId: string) {
     await prisma.customerAlias.upsert({
       where: { csvCustomerName },

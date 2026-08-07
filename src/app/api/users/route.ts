@@ -13,9 +13,15 @@ export async function GET() {
       email: true,
       name: true,
       role: true,
+      staffRole: true,
       clientId: true,
       createdAt: true,
       client: { select: { name: true } },
+      managedClients: {
+        where: { active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      },
     },
   });
 
@@ -25,7 +31,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   await requireAdmin();
   const body = await request.json();
-  const { name, email, password, role = "ADMIN", clientId } = body;
+  const { name, email, password, role = "ADMIN", clientId, staffRole } = body;
 
   if (!name?.trim() || !email?.trim() || !password) {
     return NextResponse.json(
@@ -48,6 +54,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (role === "STAFF" && !staffRole) {
+    return NextResponse.json(
+      { error: "Staff type (Account Manager or Designer) is required" },
+      { status: 400 }
+    );
+  }
+
+  if (role !== "STAFF" && staffRole) {
+    return NextResponse.json({ error: "Staff type only applies to staff users" }, { status: 400 });
+  }
+
   const existing = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
   });
@@ -62,6 +79,7 @@ export async function POST(request: NextRequest) {
       email: email.toLowerCase().trim(),
       passwordHash,
       role,
+      staffRole: role === "STAFF" ? staffRole : null,
       clientId: role === "CLIENT" ? clientId : null,
     },
     select: {
@@ -69,6 +87,7 @@ export async function POST(request: NextRequest) {
       email: true,
       name: true,
       role: true,
+      staffRole: true,
       clientId: true,
       createdAt: true,
       client: { select: { name: true } },

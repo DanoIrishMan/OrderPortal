@@ -10,10 +10,14 @@ const adminLinks = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/clients", label: "Clients" },
   { href: "/admin/orders", label: "Orders" },
-  { href: "/admin/imports/pdf", label: "In-House PDF" },
-  { href: "/admin/imports/csv", label: "Weekly Production CSV" },
+  { href: "/admin/pathways", label: "Critical Pathways" },
+  { href: "/admin/imports", label: "Order Upload" },
   { href: "/admin/exports", label: "Export" },
   { href: "/admin/settings", label: "Settings" },
+];
+
+const staffLinks = [
+  { href: "/staff/pathways", label: "My Tasks" },
 ];
 
 const portalLinks = [
@@ -36,7 +40,10 @@ function NavLinks({
   return (
     <>
       {links.map((link) => {
-        const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const isRootDashboard = link.href === "/admin" || link.href === "/staff";
+        const active = isRootDashboard
+          ? pathname === link.href
+          : pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}
@@ -61,7 +68,23 @@ export function NavBar({ session: initialSession }: { session?: Session | null }
   const { data: clientSession } = useSession();
   const session = clientSession ?? initialSession ?? null;
   const isAdmin = session?.user?.role === "ADMIN";
-  const links = isAdmin ? adminLinks : portalLinks;
+  const isStaff = session?.user?.role === "STAFF";
+  const staffLinksFiltered = isStaff
+    ? [
+        ...(session?.user?.staffRole === "ACCOUNT_MANAGER"
+          ? [{ href: "/staff", label: "Dashboard" }]
+          : []),
+        { href: "/staff/pathways", label: "My Tasks" },
+        ...(session?.user?.staffRole === "ACCOUNT_MANAGER"
+          ? [
+              { href: "/staff/orders", label: "Client Orders" },
+              { href: "/staff/imports", label: "Order Upload" },
+              { href: "/staff/settings", label: "Settings" },
+            ]
+          : []),
+      ]
+    : staffLinks;
+  const links = isAdmin ? adminLinks : isStaff ? staffLinksFiltered : portalLinks;
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -72,7 +95,7 @@ export function NavBar({ session: initialSession }: { session?: Session | null }
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3 md:gap-8">
-          <Link href={isAdmin ? "/admin" : "/portal"} className="text-lg font-semibold text-slate-900">
+          <Link href={isAdmin ? "/admin" : isStaff ? "/staff" : "/portal"} className="text-lg font-semibold text-slate-900">
             Pro Club Portal
           </Link>
           <nav className="hidden gap-1 md:flex">
@@ -83,7 +106,13 @@ export function NavBar({ session: initialSession }: { session?: Session | null }
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium text-slate-900">{session?.user?.name}</p>
             <p className="text-xs text-slate-500">
-              {isAdmin ? "Administrator" : session?.user?.clientName}
+              {isAdmin
+                ? "Administrator"
+                : isStaff
+                  ? session?.user?.staffRole === "DESIGNER"
+                    ? "Designer"
+                    : "Account Manager"
+                  : session?.user?.clientName}
             </p>
           </div>
           <button
@@ -118,7 +147,13 @@ export function NavBar({ session: initialSession }: { session?: Session | null }
           <div className="mb-3 sm:hidden">
             <p className="text-sm font-medium text-slate-900">{session?.user?.name}</p>
             <p className="text-xs text-slate-500">
-              {isAdmin ? "Administrator" : session?.user?.clientName}
+              {isAdmin
+                ? "Administrator"
+                : isStaff
+                  ? session?.user?.staffRole === "DESIGNER"
+                    ? "Designer"
+                    : "Account Manager"
+                  : session?.user?.clientName}
             </p>
           </div>
           <div className="flex flex-col gap-1">
