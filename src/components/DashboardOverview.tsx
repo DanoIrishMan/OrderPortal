@@ -53,7 +53,7 @@ export function DashboardOverview({
         }
       />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 stat-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Orders" value={stats.totalOrders} />
         <StatCard label="Overdue Deliveries" value={stats.overdueOrders} hint="Past expected date" />
         <StatCard label="Active Clients" value={activeClients} />
@@ -62,12 +62,12 @@ export function DashboardOverview({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Orders by Status</h2>
+          <h2 className="section-title mb-4">Orders by Status</h2>
           <div className="space-y-3">
             {DISPLAY_STATUS_ORDER.map((status) => (
-              <div key={status} className="flex items-center justify-between">
+              <div key={status} className="status-row">
                 <StatusBadge status={status} />
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-semibold tabular-nums text-primary">
                   {statusMap[status] ?? 0}
                 </span>
               </div>
@@ -76,20 +76,20 @@ export function DashboardOverview({
         </div>
 
         <div className="card">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Recent Imports</h2>
+          <h2 className="section-title mb-4">Recent Imports</h2>
           {stats.recentImports.length === 0 ? (
-            <p className="text-sm text-slate-500">No imports yet. Upload a PDF or CSV to get started.</p>
+            <p className="text-sm text-caption">No imports yet. Upload a PDF or CSV to get started.</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="import-list">
               {stats.recentImports.map((batch) => (
-                <li key={batch.id} className="flex items-center justify-between py-3">
+                <li key={batch.id} className="import-list-item">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{batch.filename}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-medium text-primary">{batch.filename}</p>
+                    <p className="text-xs text-caption">
                       {batch.client?.name ?? "All clubs"} · {batch.type} · {batch.successCount} rows
                     </p>
                   </div>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-caption">
                     {formatDateTime(batch.createdAt)}
                   </span>
                 </li>

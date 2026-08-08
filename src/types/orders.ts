@@ -13,7 +13,18 @@ export interface ParsedOrderRow {
   leavingOsFactoryDate?: string | null;
   actualDeliveryDate?: string | null;
   notes?: string | null;
-  lineItems?: Array<{ description: string; quantity?: number; unitPrice?: number }>;
+  lineItems?: Array<{
+    description: string;
+    quantity?: number;
+    unitPrice?: number;
+    colour?: string;
+    sizes?: Record<string, number>;
+    crest?: string;
+    initials?: string;
+    spons?: string;
+    text?: string;
+    other?: string;
+  }>;
   isDuplicate?: boolean;
   existingOrderId?: string;
   warnings?: string[];

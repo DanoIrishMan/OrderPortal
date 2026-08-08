@@ -31,12 +31,14 @@ enum OrderStatus {
 enum OrderSource {
   PDF_IMPORT
   CSV_IMPORT
+  EXCEL_IMPORT
   MANUAL
 }
 
 enum ImportType {
   PDF
   CSV
+  EXCEL
 }
 
 enum ImportStatus {

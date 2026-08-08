@@ -42,9 +42,9 @@ interface PathwayTask {
 }
 
 function statusBadge(status: ReturnType<typeof pathwayTaskStatus>) {
-  if (status === "complete") return "bg-green-100 text-green-800";
-  if (status === "overdue") return "bg-red-100 text-red-800";
-  return "bg-slate-100 text-slate-700";
+  if (status === "complete") return "pathway-status pathway-status-complete";
+  if (status === "overdue") return "pathway-status pathway-status-overdue";
+  return "pathway-status pathway-status-upcoming";
 }
 
 export default function StaffPathwaysPage() {
@@ -172,13 +172,13 @@ export default function StaffPathwaysPage() {
       />
 
       {loading ? (
-        <p className="text-slate-500">Loading...</p>
+        <p className="text-caption">Loading...</p>
       ) : clients.length === 0 ? (
-        <div className="card text-sm text-slate-600">No clients assigned yet.</div>
+        <div className="card text-sm text-body">No clients assigned yet.</div>
       ) : (
         <div className="space-y-6">
           <div className="card">
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Clients</h2>
+            <h2 className="section-title mb-3 text-sm">Clients</h2>
             <div className="flex flex-wrap gap-2">
               {clients.map((client) => {
                 const taskCount = tasks.filter(
@@ -191,18 +191,10 @@ export default function StaffPathwaysPage() {
                     key={client.id}
                     type="button"
                     onClick={() => setSelectedClientId(client.id)}
-                    className={`rounded-lg border px-4 py-3 text-left transition ${
-                      active
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-900 hover:border-slate-300"
-                    }`}
+                    className={`client-picker-btn ${active ? "client-picker-btn-active" : ""}`}
                   >
                     <p className="text-sm font-medium">{client.name}</p>
-                    <p
-                      className={`mt-1 text-xs ${
-                        active ? "text-slate-300" : "text-slate-500"
-                      }`}
-                    >
+                    <p className="text-caption mt-1 text-xs">
                       {taskCount} task{taskCount === 1 ? "" : "s"}
                     </p>
                   </button>
@@ -212,9 +204,9 @@ export default function StaffPathwaysPage() {
           </div>
 
           {!selectedClient ? (
-            <div className="card text-sm text-slate-600">Select a client to view tasks.</div>
+            <div className="card text-sm text-body">Select a client to view tasks.</div>
           ) : filteredTasks.length === 0 ? (
-            <div className="card text-sm text-slate-600">
+            <div className="card text-sm text-body">
               No pathway tasks for {selectedClient.name} yet.
             </div>
           ) : (
@@ -250,18 +242,14 @@ export default function StaffPathwaysPage() {
                         <td>{assignee}</td>
                         <td>{formatDate(new Date(task.dueDate))}</td>
                         <td>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadge(status)}`}
-                          >
-                            {status}
-                          </span>
+                          <span className={statusBadge(status)}>{status}</span>
                         </td>
                       </tr>,
                     ];
 
                     for (const subTask of task.subTasks) {
                       rows.push(
-                        <tr key={subTask.id} className="bg-slate-50/70">
+                        <tr key={subTask.id} className="table-subrow">
                           <td className="pl-8">
                             <input
                               type="checkbox"
@@ -272,15 +260,15 @@ export default function StaffPathwaysPage() {
                             />
                           </td>
                           <td />
-                          <td className="text-sm text-slate-700">
-                            <span className="mr-2 text-slate-400">↳</span>
+                          <td className="text-sm text-body">
+                            <span className="text-caption mr-2">↳</span>
                             {subTask.title}
                           </td>
-                          <td className="text-sm text-slate-600">{assignee}</td>
+                          <td className="text-sm text-body">{assignee}</td>
                           <td />
                           <td>
                             {subTask.completedAt ? (
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-caption">
                                 {subTask.completedBy?.name ?? "Done"}
                               </span>
                             ) : (

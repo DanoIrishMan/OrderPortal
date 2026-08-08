@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { getSession } from "@/lib/auth";
@@ -27,8 +28,16 @@ export default async function RootLayout({
   const session = await getSession();
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full bg-slate-50 antialiased">
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+      suppressHydrationWarning
+    >
+      <body
+        className="flex min-h-full flex-col font-sans antialiased"
+        suppressHydrationWarning
+      >
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
         <Providers session={session}>{children}</Providers>
       </body>
     </html>

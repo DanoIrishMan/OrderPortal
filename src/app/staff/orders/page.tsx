@@ -94,47 +94,31 @@ export default function StaffOrdersPage() {
         description="Orders for clients assigned to you as Account Manager"
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 view-tabs">
         <button
           type="button"
           onClick={() => setView("all")}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            view === "all"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-          }`}
+          className={`view-tab ${view === "all" ? "view-tab-active" : ""}`}
         >
           All Orders
         </button>
         <button
           type="button"
           onClick={() => setView("active")}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            view === "active"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-          }`}
+          className={`view-tab ${view === "active" ? "view-tab-active" : ""}`}
         >
           Active Orders
         </button>
         <button
           type="button"
           onClick={() => setView("delivered")}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            view === "delivered"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-          }`}
+          className={`view-tab ${view === "delivered" ? "view-tab-active" : ""}`}
         >
           Delivered Orders
         </button>
       </div>
 
-      {loadError && (
-        <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-          {loadError}
-        </div>
-      )}
+      {loadError && <div className="alert alert-error mb-4">{loadError}</div>}
 
       <div className={`mb-6 grid gap-3 ${clientId ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
         <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>

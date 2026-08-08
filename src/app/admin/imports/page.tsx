@@ -6,7 +6,7 @@ export default function AdminOrderUploadPage() {
     <div>
       <PageHeader
         title="Order Upload"
-        description="Upload in-house PDF orders or the weekly production CSV"
+        description="Upload in-house PDF orders, stock/embroidery Excel files, or the weekly production CSV"
       />
       <OrderUploadHub />
     </div>

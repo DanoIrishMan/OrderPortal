@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,22 +35,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-slate-900">Pro Club Order Portal</h1>
-          <p className="mt-2 text-sm text-slate-600">
+    <div className="login-shell">
+      <div className="login-theme-toggle">
+        <ThemeToggle />
+      </div>
+      <div className="login-panel">
+        <div className="login-brand">
+          <div className="login-logo">PC</div>
+          <h1 className="page-title">Pro Club Order Portal</h1>
+          <p className="page-description mx-auto">
             Sign in to manage orders or view your club updates
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="card space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          )}
+        <form onSubmit={handleSubmit} className="card login-form">
+          {error && <div className="alert alert-error">{error}</div>}
 
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="email" className="form-label">
               Email
             </label>
             <input
@@ -64,7 +67,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="password" className="form-label">
               Password
             </label>
             <input
@@ -83,7 +86,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-muted">
           Demo: admin@portal.local / admin123 · staff: daniel.ennis@portal.local / staff123
         </p>
       </div>

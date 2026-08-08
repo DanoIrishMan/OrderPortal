@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { WeeklyExportSettings } from "@/components/WeeklyExportSettings";
@@ -16,11 +15,6 @@ export default async function StaffSettingsPage() {
       <PageHeader
         title="Settings"
         description="Manage your account and weekly export schedules for assigned clients"
-        action={
-          <Link href="/staff/account" className="text-sm font-medium text-slate-700 hover:underline">
-            Change password
-          </Link>
-        }
       />
 
       <WeeklyExportSettings emptyClientsMessage="No clients assigned to you yet" />

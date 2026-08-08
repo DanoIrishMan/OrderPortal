@@ -427,6 +427,64 @@ export async function commitPdfImport(params: {
   return { created, skipped, errors };
 }
 
+export async function commitStockOrderImport(params: {
+  clientId: string;
+  batchId: string;
+  row: ParsedOrderRow;
+  skipDuplicates?: boolean;
+}) {
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+  const row = params.row;
+
+  if (!row.orderNumber?.trim()) {
+    return { created: 0, skipped: 1, errors: ["Order number is required"] };
+  }
+
+  if (row.isDuplicate && params.skipDuplicates) {
+    await prisma.importBatch.update({
+      where: { id: params.batchId },
+      data: { status: "COMMITTED", committedAt: new Date(), successCount: 0, errorCount: 0 },
+    });
+    return { created: 0, skipped: 1, errors: [] };
+  }
+
+  try {
+    const data = rowToOrderFields(row, params.clientId, OrderSource.EXCEL_IMPORT, params.batchId);
+
+    if (row.isDuplicate && row.existingOrderId) {
+      await prisma.order.update({
+        where: { id: row.existingOrderId },
+        data,
+      });
+    } else {
+      await prisma.order.create({ data });
+    }
+
+    created = 1;
+
+    await prisma.importBatch.update({
+      where: { id: params.batchId },
+      data: {
+        clientId: params.clientId,
+        status: "COMMITTED",
+        committedAt: new Date(),
+        successCount: 1,
+        errorCount: 0,
+      },
+    });
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "Failed to save order");
+    await prisma.importBatch.update({
+      where: { id: params.batchId },
+      data: { status: "FAILED", errorCount: 1, errors: errors.join("; ") },
+    });
+  }
+
+  return { created, skipped, errors };
+}
+
 export async function getDashboardStats(options?: {
   clientId?: string;
   accountManagerId?: string;

@@ -9,8 +9,8 @@ export default function AdminAccountPage() {
         title="Change Password"
         description="Update your admin login credentials"
         action={
-          <Link href="/admin/settings" className="btn-secondary">
-            Back to settings
+          <Link href="/admin" className="btn-secondary">
+            Back to dashboard
           </Link>
         }
       />

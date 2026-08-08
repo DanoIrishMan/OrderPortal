@@ -36,9 +36,9 @@ interface Pathway {
 }
 
 function statusBadge(status: ReturnType<typeof pathwayTaskStatus>) {
-  if (status === "complete") return "bg-green-100 text-green-800";
-  if (status === "overdue") return "bg-red-100 text-red-800";
-  return "bg-slate-100 text-slate-700";
+  if (status === "complete") return "pathway-status pathway-status-complete";
+  if (status === "overdue") return "pathway-status pathway-status-overdue";
+  return "pathway-status pathway-status-upcoming";
 }
 
 function subTaskProgress(subTasks: PathwaySubTask[]) {
@@ -190,8 +190,8 @@ export default function PathwayDetailPage() {
     await loadPathway();
   }
 
-  if (loading) return <p className="text-slate-500">Loading...</p>;
-  if (!pathway) return <p className="text-red-600">Pathway not found</p>;
+  if (loading) return <p className="text-caption">Loading...</p>;
+  if (!pathway) return <p className="alert alert-error inline-block">Pathway not found</p>;
 
   return (
     <div>
@@ -205,7 +205,7 @@ export default function PathwayDetailPage() {
         }
       />
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="alert alert-error mb-4">{error}</p>}
 
       <div className="space-y-4">
         {pathway.tasks.map((task) => {
@@ -224,22 +224,18 @@ export default function PathwayDetailPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-sm font-semibold text-slate-900">{task.title}</h2>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadge(status)}`}
-                    >
-                      {status}
-                    </span>
+                    <h2 className="section-title text-sm">{task.title}</h2>
+                    <span className={statusBadge(status)}>{status}</span>
                   </div>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-body">
                     Deadline: {formatDate(new Date(task.dueDate))}
                     {task.completedBy ? ` · Completed by ${task.completedBy.name}` : ""}
                     {progress ? ` · ${progress}` : ""}
                   </p>
                   <div className="mt-2 space-y-2">
-                    <p className="text-sm font-medium text-slate-700">Assign to:</p>
+                    <p className="text-sm font-medium text-primary">Assign to:</p>
                     <div className="flex flex-wrap gap-4">
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <label className="flex items-center gap-2 text-sm text-body">
                         <input
                           type="checkbox"
                           checked={task.assignAccountManager}
@@ -255,7 +251,7 @@ export default function PathwayDetailPage() {
                         />
                         {pathway.accountManager.name} (Account Manager)
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <label className="flex items-center gap-2 text-sm text-body">
                         <input
                           type="checkbox"
                           checked={task.assignDesigner}
@@ -278,14 +274,11 @@ export default function PathwayDetailPage() {
 
               <div className="mt-4 space-y-2">
                 {task.subTasks.length === 0 ? (
-                  <p className="text-sm text-slate-500">No sub-tasks yet.</p>
+                  <p className="text-sm text-caption">No sub-tasks yet.</p>
                 ) : (
                   task.subTasks.map((subTask) => (
-                    <div
-                      key={subTask.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2"
-                    >
-                      <label className="flex flex-1 items-center gap-3 text-sm">
+                    <div key={subTask.id} className="subtask-row">
+                      <label className="flex flex-1 items-center gap-3 text-sm text-body">
                         <input
                           type="checkbox"
                           checked={!!subTask.completedAt}
@@ -293,13 +286,13 @@ export default function PathwayDetailPage() {
                           onChange={(e) => toggleSubTask(subTask, e.target.checked)}
                           className="rounded"
                         />
-                        <span className={subTask.completedAt ? "text-slate-500 line-through" : ""}>
+                        <span className={subTask.completedAt ? "subtask-row-completed" : ""}>
                           {subTask.title}
                         </span>
                       </label>
                       <div className="flex items-center gap-3">
                         {subTask.completedBy && (
-                          <span className="text-xs text-slate-500">{subTask.completedBy.name}</span>
+                          <span className="text-xs text-caption">{subTask.completedBy.name}</span>
                         )}
                         <button
                           type="button"
