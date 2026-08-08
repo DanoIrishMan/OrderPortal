@@ -485,6 +485,29 @@ export async function commitStockOrderImport(params: {
   return { created, skipped, errors };
 }
 
+export async function commitStockOrderImports(params: {
+  items: Array<{ clientId: string; batchId: string; row: ParsedOrderRow }>;
+  skipDuplicates?: boolean;
+}) {
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const item of params.items) {
+    const result = await commitStockOrderImport({
+      clientId: item.clientId,
+      batchId: item.batchId,
+      row: item.row,
+      skipDuplicates: params.skipDuplicates,
+    });
+    created += result.created;
+    skipped += result.skipped;
+    errors.push(...result.errors);
+  }
+
+  return { created, skipped, errors };
+}
+
 export async function getDashboardStats(options?: {
   clientId?: string;
   accountManagerId?: string;

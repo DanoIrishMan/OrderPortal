@@ -12,23 +12,29 @@ interface Client {
   name: string;
 }
 
-interface ReviewState {
+interface ReviewItem {
   batchId: string;
   filename: string;
   parsed: StockOrderParseResult;
   row: ParsedOrderRow;
-  clients: Client[];
   suggestedClientId: string | null;
   suggestedClientName: string | null;
+  clientId: string | null;
   isDuplicate: boolean;
+}
+
+interface ReviewState {
+  items: ReviewItem[];
+  clients: Client[];
   warnings: string[];
+  duplicateCount: number;
 }
 
 export default function StockOrderImportPageClient() {
   const searchParams = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState(searchParams.get("clientId") || "");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<FileList | null>(null);
   const [loading, setLoading] = useState(false);
   const [review, setReview] = useState<ReviewState | null>(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
@@ -43,7 +49,7 @@ export default function StockOrderImportPageClient() {
 
   async function handleUpload(e: FormEvent) {
     e.preventDefault();
-    if (!file) return;
+    if (!files?.length) return;
 
     setLoading(true);
     setCommitResult(null);
@@ -51,20 +57,26 @@ export default function StockOrderImportPageClient() {
 
     try {
       const formData = new FormData();
-      formData.set("file", file);
+      Array.from(files).forEach((file) => formData.append("files", file));
       if (clientId) formData.set("clientId", clientId);
 
       const res = await fetch("/api/imports/stock-order", { method: "POST", body: formData });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to parse Excel file");
+        setError(data.error || "Failed to parse Excel files");
         return;
       }
 
-      setReview(data);
-      if (data.clientId) setClientId(data.clientId);
-      else if (data.suggestedClientId) setClientId(data.suggestedClientId);
+      setReview({
+        items: data.items.map((item: ReviewItem) => ({
+          ...item,
+          clientId: item.clientId || item.suggestedClientId || clientId || null,
+        })),
+        clients: data.clients ?? clients,
+        warnings: data.warnings ?? [],
+        duplicateCount: data.duplicateCount ?? 0,
+      });
     } catch {
       setError("Upload failed. Check your connection and try again.");
     } finally {
@@ -73,7 +85,19 @@ export default function StockOrderImportPageClient() {
   }
 
   async function handleCommit() {
-    if (!review || !clientId) return;
+    if (!review) return;
+
+    const items = review.items.filter((item) => item.clientId && item.row.orderNumber?.trim());
+    if (items.length === 0) {
+      setError("Select a club for each order before saving.");
+      return;
+    }
+
+    if (items.length < review.items.length) {
+      setError("Some orders are missing a club or order number.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -82,9 +106,11 @@ export default function StockOrderImportPageClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId,
-          batchId: review.batchId,
-          row: review.row,
+          items: items.map((item) => ({
+            clientId: item.clientId,
+            batchId: item.batchId,
+            row: item.row,
+          })),
           skipDuplicates,
         }),
       });
@@ -96,13 +122,9 @@ export default function StockOrderImportPageClient() {
         return;
       }
 
-      if (data.skipped && !data.created) {
-        setCommitResult("Order skipped (already exists).");
-      } else {
-        setCommitResult(`Added ${data.created} order(s). Skipped ${data.skipped}.`);
-      }
+      setCommitResult(`Added ${data.created} order(s). Skipped ${data.skipped}.`);
       setReview(null);
-      setFile(null);
+      setFiles(null);
     } catch {
       setError("Failed to save import. Please try again.");
     } finally {
@@ -110,9 +132,32 @@ export default function StockOrderImportPageClient() {
     }
   }
 
-  function updateRow(field: keyof ParsedOrderRow, value: string) {
+  function updateItem(index: number, updates: Partial<ReviewItem>) {
     if (!review) return;
-    setReview({ ...review, row: { ...review.row, [field]: value } });
+    const items = [...review.items];
+    items[index] = { ...items[index], ...updates };
+    if (updates.row) {
+      items[index].row = updates.row;
+    }
+    setReview({ ...review, items });
+  }
+
+  function updateRow(index: number, field: keyof ParsedOrderRow, value: string) {
+    if (!review) return;
+    const items = [...review.items];
+    items[index] = {
+      ...items[index],
+      row: { ...items[index].row, [field]: value },
+    };
+    setReview({ ...review, items });
+  }
+
+  function removeItem(index: number) {
+    if (!review) return;
+    setReview({
+      ...review,
+      items: review.items.filter((_, i) => i !== index),
+    });
   }
 
   const displayClients = review?.clients.length ? review.clients : clients;
@@ -121,7 +166,7 @@ export default function StockOrderImportPageClient() {
     <div>
       <PageHeader
         title="Order Upload"
-        description="Upload OrderWise Core Stock Order Form Excel files for stock garments sent to embroidery."
+        description="Upload OrderWise Core Stock Order Form Excel files for stock garments sent to embroidery or print."
       />
 
       <OrderUploadTabs />
@@ -163,8 +208,8 @@ export default function StockOrderImportPageClient() {
               Stock / Embroidery Excel
             </label>
             <p className="mb-2 text-xs text-slate-500">
-              OrderWise Core Stock Order Form v17 (.xlsx). One portal order is created from the first
-              worksheet tab.
+              OrderWise Core Stock Order Form v17 (.xlsx). One portal order per spreadsheet — you
+              can select multiple files at once.
             </p>
             <p className="mb-2 text-xs text-slate-500">
               <a
@@ -178,166 +223,210 @@ export default function StockOrderImportPageClient() {
             <input
               type="file"
               accept=".xlsx,.xls"
+              multiple
               className="input"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setFiles(e.target.files)}
               required
             />
           </div>
 
-          <button type="submit" className="btn-primary" disabled={loading || !file}>
+          <button type="submit" className="btn-primary" disabled={loading || !files?.length}>
             {loading ? "Parsing Excel..." : "Upload & Review"}
           </button>
         </form>
       ) : (
         <div className="space-y-6">
-          {(review.warnings.length > 0 || review.parsed.warnings.length > 0) && (
+          {review.warnings.length > 0 && (
             <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
               <p className="font-medium">Parser warnings</p>
               <ul className="mt-2 list-disc pl-5">
-                {[...review.warnings, ...review.parsed.warnings].map((w, i) => (
+                {review.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          <div className="card space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="section-title">{review.parsed.orderNumber || "No order number"}</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {review.filename} · {review.parsed.customerName}
-                </p>
-                {review.suggestedClientName && !clientId && (
-                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                    Suggested club: {review.suggestedClientName}
-                  </p>
-                )}
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={skipDuplicates}
-                  onChange={(e) => setSkipDuplicates(e.target.checked)}
-                />
-                Skip if order already exists
-              </label>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Club
-              </label>
-              <select
-                className="input max-w-md"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                required
-              >
-                <option value="">Select a club</option>
-                {displayClients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500">Date ordered</p>
-                <input
-                  className="input mt-1"
-                  value={review.row.orderDate || ""}
-                  onChange={(e) => updateRow("orderDate", e.target.value)}
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500">Date wanted</p>
-                <input
-                  className="input mt-1"
-                  value={review.row.expectedDeliveryDate || ""}
-                  onChange={(e) => updateRow("expectedDeliveryDate", e.target.value)}
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500">PO number</p>
-                <input
-                  className="input mt-1"
-                  value={review.row.poNumber || ""}
-                  onChange={(e) => updateRow("poNumber", e.target.value)}
-                />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500">Total qty</p>
-                <input
-                  className="input mt-1"
-                  value={review.row.quantity ?? ""}
-                  onChange={(e) => updateRow("quantity", e.target.value)}
-                />
-              </div>
-            </div>
-
-            {review.parsed.embroidery.length > 0 && (
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Embroidery</p>
-                <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
-                  {review.parsed.embroidery.map((line, i) => (
-                    <li key={i}>
-                      <span className="font-medium">{line.label}:</span> {line.description}
-                      {line.code ? ` (${line.code})` : ""}
-                      {line.position ? ` – ${line.position}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Colour</th>
-                    <th>Sizes</th>
-                    <th>Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {review.parsed.lineItems.map((item, i) => (
-                    <tr key={i}>
-                      <td>{item.description}</td>
-                      <td>{item.colour || "—"}</td>
-                      <td>
-                        {item.sizes
-                          ? Object.entries(item.sizes)
-                              .map(([size, qty]) => `${size}: ${qty}`)
-                              .join(", ")
-                          : "—"}
-                      </td>
-                      <td>{item.quantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Section: {review.row.section ?? "Embroidery"} ·{" "}
-              {review.isDuplicate ? (
-                <span className="text-amber-700 dark:text-amber-300">Order already exists for this club</span>
-              ) : (
-                "New order"
-              )}
+              {review.items.length} order(s) extracted · {review.duplicateCount} existing order(s)
+              found
             </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={skipDuplicates}
+                onChange={(e) => setSkipDuplicates(e.target.checked)}
+              />
+              Skip existing orders (do not update)
+            </label>
           </div>
 
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Order #</th>
+                  <th>Customer</th>
+                  <th>Club</th>
+                  <th>Section</th>
+                  <th>Date wanted</th>
+                  <th>Qty</th>
+                  <th>Exists?</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {review.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-slate-500">
+                      No orders to import.
+                    </td>
+                  </tr>
+                ) : (
+                  review.items.map((item, index) => (
+                    <tr key={item.batchId} className={item.isDuplicate ? "bg-amber-50 dark:bg-amber-950/30" : ""}>
+                      <td className="max-w-[10rem] truncate text-xs" title={item.filename}>
+                        {item.filename}
+                      </td>
+                      <td>
+                        <input
+                          className="input min-w-[6rem]"
+                          value={item.row.orderNumber}
+                          onChange={(e) => updateRow(index, "orderNumber", e.target.value)}
+                        />
+                      </td>
+                      <td className="max-w-[10rem] truncate text-sm" title={item.parsed.customerName}>
+                        {item.parsed.customerName || "—"}
+                      </td>
+                      <td>
+                        <select
+                          className="input min-w-[10rem]"
+                          value={item.clientId ?? ""}
+                          onChange={(e) =>
+                            updateItem(index, { clientId: e.target.value || null })
+                          }
+                        >
+                          <option value="">Select club</option>
+                          {displayClients.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        {item.suggestedClientName && !item.clientId && (
+                          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                            Suggested: {item.suggestedClientName}
+                          </p>
+                        )}
+                      </td>
+                      <td>
+                        <input
+                          className="input min-w-[6rem]"
+                          value={item.row.section ?? ""}
+                          onChange={(e) => updateRow(index, "section", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input min-w-[7rem]"
+                          value={item.row.expectedDeliveryDate || ""}
+                          onChange={(e) => updateRow(index, "expectedDeliveryDate", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input w-20"
+                          value={item.row.quantity ?? ""}
+                          onChange={(e) => updateRow(index, "quantity", e.target.value)}
+                        />
+                      </td>
+                      <td>{item.isDuplicate ? "Yes" : "No"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="text-sm text-red-600 hover:underline dark:text-red-400"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {review.items.map((item, index) => (
+            <details key={`${item.batchId}-details`} className="card">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">
+                {item.row.orderNumber || item.filename} — {item.parsed.lineItems.length} product line(s)
+              </summary>
+              <div className="mt-4 space-y-4">
+                {item.parsed.embroidery.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-sm font-medium">Embroidery / print</p>
+                    <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                      {item.parsed.embroidery.map((line, i) => (
+                        <li key={i}>
+                          <span className="font-medium">{line.label}:</span> {line.description}
+                          {line.code ? ` (${line.code})` : ""}
+                          {line.position ? ` – ${line.position}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Colour</th>
+                        <th>Sizes</th>
+                        <th>Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {item.parsed.lineItems.map((lineItem, i) => (
+                        <tr key={i}>
+                          <td>{lineItem.description}</td>
+                          <td>{lineItem.colour || "—"}</td>
+                          <td>
+                            {lineItem.sizes
+                              ? Object.entries(lineItem.sizes)
+                                  .map(([size, qty]) => `${size}: ${qty}`)
+                                  .join(", ")
+                              : "—"}
+                          </td>
+                          <td>{lineItem.quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </details>
+          ))}
+
           <div className="flex gap-3">
-            <button onClick={handleCommit} className="btn-primary" disabled={loading || !clientId}>
-              {loading ? "Saving..." : "Add Order"}
+            <button
+              onClick={handleCommit}
+              className="btn-primary"
+              disabled={loading || review.items.length === 0}
+            >
+              {loading ? "Saving..." : `Add ${review.items.length} Order(s)`}
             </button>
-            <button onClick={() => setReview(null)} className="btn-secondary">
-              Upload Different File
+            <button
+              onClick={() => {
+                setReview(null);
+                setFiles(null);
+              }}
+              className="btn-secondary"
+            >
+              Upload Different Files
             </button>
           </div>
         </div>
